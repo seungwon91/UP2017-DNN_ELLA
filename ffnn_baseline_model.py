@@ -49,24 +49,14 @@ class FFNN_minibatch():
         self.batch_size = batch_size
 
         #### data
-        self.train_x = tf.constant(data_list[0], dtype=tf.float32)
-        self.train_y = tf.constant(data_list[1], dtype=tf.float32)
-        self.valid_x = tf.constant(data_list[2], dtype=tf.float32)
-        self.valid_y = tf.constant(data_list[3], dtype=tf.float32)
-        self.test_x = tf.constant(data_list[4], dtype=tf.float32)
-        self.test_y = tf.constant(data_list[5], dtype=tf.float32)
+        self.data = tflized_data(data_list, do_MTL=False)
 
         #### placeholder of model
         self.data_index = tf.placeholder(dtype=tf.int32)
         self.epoch = tf.placeholder(dtype=tf.float32)
 
         #### mini-batch for training/validation/test data
-        train_x_batch = tf.slice(self.train_x, [self.batch_size * self.data_index, 0], [self.batch_size, -1])
-        train_y_batch =tf.slice(self.train_y, [self.batch_size * self.data_index, 0], [self.batch_size, -1])
-        valid_x_batch = tf.slice(self.valid_x, [self.batch_size * self.data_index, 0], [self.batch_size, -1])
-        valid_y_batch =tf.slice(self.valid_y, [self.batch_size * self.data_index, 0], [self.batch_size, -1])
-        test_x_batch = tf.slice(self.test_x, [self.batch_size * self.data_index, 0], [self.batch_size, -1])
-        test_y_batch =tf.slice(self.test_y, [self.batch_size * self.data_index, 0], [self.batch_size, -1])
+        train_x_batch, train_y_batch, valid_x_batch, valid_y_batch, test_x_batch, test_y_batch = minibatched_data(self.data, self.batch_size, self.data_index, do_MTL=False)
 
         #### layers of model for train data
         if classification:
@@ -131,32 +121,14 @@ class MTL_FFNN_minibatch():
         self.batch_size = batch_size
 
         #### data
-        if self.num_tasks < 2:
-            self.train_x = [tf.constant(data_list[0], dtype=tf.float32)]
-            self.train_y = [tf.constant(data_list[1], dtype=tf.float32)]
-            self.valid_x = [tf.constant(data_list[2], dtype=tf.float32)]
-            self.valid_y = [tf.constant(data_list[3], dtype=tf.float32)]
-            self.test_x = [tf.constant(data_list[4], dtype=tf.float32)]
-            self.test_y = [tf.constant(data_list[5], dtype=tf.float32)]
-        else:
-            self.train_x = [tf.constant(data_list[0][x][0], dtype=tf.float32) for x in range(self.num_tasks)]
-            self.train_y = [tf.constant(data_list[0][x][1], dtype=tf.float32) for x in range(self.num_tasks)]
-            self.valid_x = [tf.constant(data_list[1][x][0], dtype=tf.float32) for x in range(self.num_tasks)]
-            self.valid_y = [tf.constant(data_list[1][x][1], dtype=tf.float32) for x in range(self.num_tasks)]
-            self.test_x = [tf.constant(data_list[2][x][0], dtype=tf.float32) for x in range(self.num_tasks)]
-            self.test_y = [tf.constant(data_list[2][x][1], dtype=tf.float32) for x in range(self.num_tasks)]
+        self.data = tflized_data(data_list, do_MTL=True, num_tasks=num_tasks)
 
         #### placeholder of model
         self.data_index = tf.placeholder(dtype=tf.int32)
         self.epoch = tf.placeholder(dtype=tf.float32)
 
         #### mini-batch for training/validation/test data
-        train_x_batch = [tf.slice(self.train_x[x], [self.batch_size * self.data_index, 0], [self.batch_size, -1]) for x in range(self.num_tasks)]
-        train_y_batch = [tf.slice(self.train_y[x], [self.batch_size * self.data_index, 0], [self.batch_size, -1]) for x in range(self.num_tasks)]
-        valid_x_batch = [tf.slice(self.valid_x[x], [self.batch_size * self.data_index, 0], [self.batch_size, -1]) for x in range(self.num_tasks)]
-        valid_y_batch = [tf.slice(self.valid_y[x], [self.batch_size * self.data_index, 0], [self.batch_size, -1]) for x in range(self.num_tasks)]
-        test_x_batch = [tf.slice(self.test_x[x], [self.batch_size * self.data_index, 0], [self.batch_size, -1]) for x in range(self.num_tasks)]
-        test_y_batch = [tf.slice(self.test_y[x], [self.batch_size * self.data_index, 0], [self.batch_size, -1]) for x in range(self.num_tasks)]
+        train_x_batch, train_y_batch, valid_x_batch, valid_y_batch, test_x_batch, test_y_batch = minibatched_data(self.data, self.batch_size, self.data_index, do_MTL=True, num_tasks=num_tasks)
 
         #### layers of model for train data
         self.train_models = []
@@ -190,31 +162,7 @@ class MTL_FFNN_minibatch():
             self.test_models.append(model_tmp)
 
         #### functions of model
-        if classification and self.layers_size[-1]>1:
-            self.train_eval = [tf.nn.softmax(self.train_models[x][-1]) for x in range(self.num_tasks)]
-            self.valid_eval = [tf.nn.softmax(self.valid_models[x][-1]) for x in range(self.num_tasks)]
-            self.test_eval = [tf.nn.softmax(self.test_models[x][-1]) for x in range(self.num_tasks)]
-
-            self.train_loss = [tf.nn.softmax_cross_entropy_with_logits(labels=train_y_batch[x], logits=self.train_models[x][-1]) for x in range(self.num_tasks)]
-            self.valid_loss = [tf.nn.softmax_cross_entropy_with_logits(labels=valid_y_batch[x], logits=self.valid_models[x][-1]) for x in range(self.num_tasks)]
-            self.test_loss = [tf.nn.softmax_cross_entropy_with_logits(labels=test_y_batch[x], logits=self.test_models[x][-1]) for x in range(self.num_tasks)]
-
-            self.train_accuracy = [tf.reduce_sum(tf.cast(tf.equal(tf.argmax(self.train_eval[x], 1), tf.argmax(train_y_batch[x], 1)), tf.float32)) for x in range(self.num_tasks)]
-            self.valid_accuracy = [tf.reduce_sum(tf.cast(tf.equal(tf.argmax(self.valid_eval[x], 1), tf.argmax(valid_y_batch[x], 1)), tf.float32)) for x in range(self.num_tasks)]
-            self.test_accuracy = [tf.reduce_sum(tf.cast(tf.equal(tf.argmax(self.test_eval[x], 1), tf.argmax(test_y_batch[x], 1)), tf.float32)) for x in range(self.num_tasks)]
-        else:
-            self.train_eval = [self.train_models[x][-1] for x in range(self.num_tasks)]
-            self.valid_eval = [self.valid_models[x][-1] for x in range(self.num_tasks)]
-            self.test_eval = [self.test_models[x][-1] for x in range(self.num_tasks)]
-
-            self.train_loss = [2.0* tf.nn.l2_loss(self.train_eval[x]-train_y_batch[x]) for x in range(self.num_tasks)]
-            self.valid_loss = [2.0* tf.nn.l2_loss(self.valid_eval[x]-valid_y_batch[x]) for x in range(self.num_tasks)]
-            self.test_loss = [2.0* tf.nn.l2_loss(self.test_eval[x]-test_y_batch[x]) for x in range(self.num_tasks)]
-
-            if classification:
-                self.train_accuracy = [tf.reduce_sum(tf.cast(tf.equal((self.train_eval[x]>0.5), (train_y_batch[x]>0.5)), tf.float32)) for x in range(self.num_tasks)]
-                self.valid_accuracy = [tf.reduce_sum(tf.cast(tf.equal((self.valid_eval[x]>0.5), (valid_y_batch[x]>0.5)), tf.float32)) for x in range(self.num_tasks)]
-                self.test_accuracy = [tf.reduce_sum(tf.cast(tf.equal((self.test_eval[x]>0.5), (test_y_batch[x]>0.5)), tf.float32)) for x in range(self.num_tasks)]
+        self.train_eval, self.valid_eval, self.test_eval, self.train_loss, self.valid_loss, self.test_loss, self.train_accuracy, self.valid_accuracy, self.test_accuracy = mtl_model_output_functions([self.train_models, self.valid_models, self.test_models], [train_y_batch, valid_y_batch, test_y_batch], num_tasks, self.layers_size[-1], classification)
 
         self.update = [tf.train.RMSPropOptimizer(learning_rate=self.learn_rate/(1.0+self.epoch/self.learn_rate_decay)).minimize(self.train_loss[x]) for x in range(self.num_tasks)]
 
@@ -234,33 +182,14 @@ class MTL_FFNN_HPS_minibatch():
         self.batch_size = batch_size
 
         #### data
-        if self.num_tasks < 2:
-            self.train_x = [tf.constant(data_list[0], dtype=tf.float32)]
-            self.train_y = [tf.constant(data_list[1], dtype=tf.float32)]
-            self.valid_x = [tf.constant(data_list[2], dtype=tf.float32)]
-
-            self.valid_y = [tf.constant(data_list[3], dtype=tf.float32)]
-            self.test_x = [tf.constant(data_list[4], dtype=tf.float32)]
-            self.test_y = [tf.constant(data_list[5], dtype=tf.float32)]
-        else:
-            self.train_x = [tf.constant(data_list[0][x][0], dtype=tf.float32) for x in range(self.num_tasks)]
-            self.train_y = [tf.constant(data_list[0][x][1], dtype=tf.float32) for x in range(self.num_tasks)]
-            self.valid_x = [tf.constant(data_list[1][x][0], dtype=tf.float32) for x in range(self.num_tasks)]
-            self.valid_y = [tf.constant(data_list[1][x][1], dtype=tf.float32) for x in range(self.num_tasks)]
-            self.test_x = [tf.constant(data_list[2][x][0], dtype=tf.float32) for x in range(self.num_tasks)]
-            self.test_y = [tf.constant(data_list[2][x][1], dtype=tf.float32) for x in range(self.num_tasks)]
+        self.data = tflized_data(data_list, do_MTL=True, num_tasks=num_tasks)
 
         #### placeholder of model
         self.data_index = tf.placeholder(dtype=tf.int32)
         self.epoch = tf.placeholder(dtype=tf.float32)
 
         #### mini-batch for training/validation/test data
-        train_x_batch = [tf.slice(self.train_x[x], [self.batch_size * self.data_index, 0], [self.batch_size, -1]) for x in range(self.num_tasks)]
-        train_y_batch = [tf.slice(self.train_y[x], [self.batch_size * self.data_index, 0], [self.batch_size, -1]) for x in range(self.num_tasks)]
-        valid_x_batch = [tf.slice(self.valid_x[x], [self.batch_size * self.data_index, 0], [self.batch_size, -1]) for x in range(self.num_tasks)]
-        valid_y_batch = [tf.slice(self.valid_y[x], [self.batch_size * self.data_index, 0], [self.batch_size, -1]) for x in range(self.num_tasks)]
-        test_x_batch = [tf.slice(self.test_x[x], [self.batch_size * self.data_index, 0], [self.batch_size, -1]) for x in range(self.num_tasks)]
-        test_y_batch = [tf.slice(self.test_y[x], [self.batch_size * self.data_index, 0], [self.batch_size, -1]) for x in range(self.num_tasks)]
+        train_x_batch, train_y_batch, valid_x_batch, valid_y_batch, test_x_batch, test_y_batch = minibatched_data(self.data, self.batch_size, self.data_index, do_MTL=True, num_tasks=num_tasks)
 
         #### layers of model for train data
         self.train_models, self.param = [], []
@@ -345,35 +274,9 @@ class MTL_FFNN_HPS_minibatch():
         #self.test_eval = self.test_models[-1]
 
         #### functions of model
-        if classification and self.independent_layers_size[-1]>1:
-            self.train_eval = [tf.nn.softmax(self.train_models[-1][x]) for x in range(self.num_tasks)]
-            self.valid_eval = [tf.nn.softmax(self.valid_models[-1][x]) for x in range(self.num_tasks)]
-            self.test_eval = [tf.nn.softmax(self.test_models[-1][x]) for x in range(self.num_tasks)]
-
-            self.train_loss = [tf.nn.softmax_cross_entropy_with_logits(labels=train_y_batch[x], logits=self.train_models[-1][x]) for x in range(self.num_tasks)]
-            self.valid_loss = [tf.nn.softmax_cross_entropy_with_logits(labels=valid_y_batch[x], logits=self.valid_models[-1][x]) for x in range(self.num_tasks)]
-            self.test_loss = [tf.nn.softmax_cross_entropy_with_logits(labels=test_y_batch[x], logits=self.test_models[-1][x]) for x in range(self.num_tasks)]
-        else:
-            self.train_eval = [self.train_models[-1][x] for x in range(self.num_tasks)]
-            self.valid_eval = [self.valid_models[-1][x] for x in range(self.num_tasks)]
-            self.test_eval = [self.test_models[-1][x] for x in range(self.num_tasks)]
-
-            self.train_loss = [2.0* tf.nn.l2_loss(self.train_eval[x]-train_y_batch[x]) for x in range(self.num_tasks)]
-            self.valid_loss = [2.0* tf.nn.l2_loss(self.valid_eval[x]-valid_y_batch[x]) for x in range(self.num_tasks)]
-            self.test_loss = [2.0* tf.nn.l2_loss(self.test_eval[x]-test_y_batch[x]) for x in range(self.num_tasks)]
+        self.train_eval, self.valid_eval, self.test_eval, self.train_loss, self.valid_loss, self.test_loss, self.train_accuracy, self.valid_accuracy, self.test_accuracy = mtl_model_output_functions([self.train_models, self.valid_models, self.test_models], [train_y_batch, valid_y_batch, test_y_batch], num_tasks, self.layers_size[-1], classification)
 
         self.update = [tf.train.RMSPropOptimizer(learning_rate=self.learn_rate/(1.0+self.epoch/self.learn_rate_decay)).minimize(self.train_loss[x]) for x in range(self.num_tasks)]
-
-        #### functions only for classification problem
-        if classification and self.independent_layers_size[-1]<2:
-            self.train_accuracy = [tf.reduce_sum(tf.cast(tf.equal((self.train_eval[x]>0.5), (train_y_batch[x]>0.5)), tf.float32)) for x in range(self.num_tasks)]
-            self.valid_accuracy = [tf.reduce_sum(tf.cast(tf.equal((self.valid_eval[x]>0.5), (valid_y_batch[x]>0.5)), tf.float32)) for x in range(self.num_tasks)]
-            self.test_accuracy = [tf.reduce_sum(tf.cast(tf.equal((self.test_eval[x]>0.5), (test_y_batch[x]>0.5)), tf.float32)) for x in range(self.num_tasks)]
-
-        elif classification:
-            self.train_accuracy = [tf.reduce_sum(tf.cast(tf.equal(tf.argmax(self.train_eval[x], 1), tf.argmax(train_y_batch[x], 1)), tf.float32)) for x in range(self.num_tasks)]
-            self.valid_accuracy = [tf.reduce_sum(tf.cast(tf.equal(tf.argmax(self.valid_eval[x], 1), tf.argmax(valid_y_batch[x], 1)), tf.float32)) for x in range(self.num_tasks)]
-            self.test_accuracy = [tf.reduce_sum(tf.cast(tf.equal(tf.argmax(self.test_eval[x], 1), tf.argmax(test_y_batch[x], 1)), tf.float32)) for x in range(self.num_tasks)]
 
 
 ########################################################
@@ -396,21 +299,7 @@ class MTL_FFNN_tensorfactor_minibatch():
         self.batch_size = batch_size
 
         #### data
-        if self.num_tasks < 2:
-
-            self.train_x = [tf.constant(data_list[0], dtype=tf.float32)]
-            self.train_y = [tf.constant(data_list[1], dtype=tf.float32)]
-            self.valid_x = [tf.constant(data_list[2], dtype=tf.float32)]
-            self.valid_y = [tf.constant(data_list[3], dtype=tf.float32)]
-            self.test_x = [tf.constant(data_list[4], dtype=tf.float32)]
-            self.test_y = [tf.constant(data_list[5], dtype=tf.float32)]
-        else:
-            self.train_x = [tf.constant(data_list[0][x][0], dtype=tf.float32) for x in range(self.num_tasks)]
-            self.train_y = [tf.constant(data_list[0][x][1], dtype=tf.float32) for x in range(self.num_tasks)]
-            self.valid_x = [tf.constant(data_list[1][x][0], dtype=tf.float32) for x in range(self.num_tasks)]
-            self.valid_y = [tf.constant(data_list[1][x][1], dtype=tf.float32) for x in range(self.num_tasks)]
-            self.test_x = [tf.constant(data_list[2][x][0], dtype=tf.float32) for x in range(self.num_tasks)]
-            self.test_y = [tf.constant(data_list[2][x][1], dtype=tf.float32) for x in range(self.num_tasks)]
+        self.data = tflized_data(data_list, do_MTL=True, num_tasks=num_tasks)
 
         #### placeholder of model
         self.data_index = tf.placeholder(dtype=tf.int32)
@@ -420,12 +309,7 @@ class MTL_FFNN_tensorfactor_minibatch():
         l1_reg, l2_reg = tf.contrib.layers.l1_regularizer(scale=self.l1_reg_scale), tf.contrib.layers.l2_regularizer(scale=self.l2_reg_scale)
 
         #### mini-batch for training/validation/test data
-        train_x_batch = [tf.slice(self.train_x[x], [self.batch_size * self.data_index, 0], [self.batch_size, -1]) for x in range(self.num_tasks)]
-        train_y_batch = [tf.slice(self.train_y[x], [self.batch_size * self.data_index, 0], [self.batch_size, -1]) for x in range(self.num_tasks)]
-        valid_x_batch = [tf.slice(self.valid_x[x], [self.batch_size * self.data_index, 0], [self.batch_size, -1]) for x in range(self.num_tasks)]
-        valid_y_batch = [tf.slice(self.valid_y[x], [self.batch_size * self.data_index, 0], [self.batch_size, -1]) for x in range(self.num_tasks)]
-        test_x_batch = [tf.slice(self.test_x[x], [self.batch_size * self.data_index, 0], [self.batch_size, -1]) for x in range(self.num_tasks)]
-        test_y_batch = [tf.slice(self.test_y[x], [self.batch_size * self.data_index, 0], [self.batch_size, -1]) for x in range(self.num_tasks)]
+        train_x_batch, train_y_batch, valid_x_batch, valid_y_batch, test_x_batch, test_y_batch = minibatched_data(self.data, self.batch_size, self.data_index, do_MTL=True, num_tasks=num_tasks)
 
         #### layers of model for train data
         self.train_models, self.KB_param, self.TS_param = [], [], []
@@ -470,35 +354,7 @@ class MTL_FFNN_tensorfactor_minibatch():
         reg_var = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
         reg_term1, reg_term2 = tf.contrib.layers.apply_regularization(l1_reg, reg_var), tf.contrib.layers.apply_regularization(l2_reg, reg_var)
 
-        if classification and self.layers_size[-1]>1:
-            self.train_eval = [tf.nn.softmax(self.train_models[-1][x]) for x in range(self.num_tasks)]
-            self.valid_eval = [tf.nn.softmax(self.valid_models[-1][x]) for x in range(self.num_tasks)]
-            self.test_eval = [tf.nn.softmax(self.test_models[-1][x]) for x in range(self.num_tasks)]
-
-            self.train_loss = [tf.nn.softmax_cross_entropy_with_logits(labels=train_y_batch[x], logits=self.train_models[-1][x]) for x in range(self.num_tasks)]
-            self.train_loss_and_reg = [self.train_loss[x] + reg_term1 + reg_term2 for x in range(self.num_tasks)]
-            self.valid_loss = [tf.nn.softmax_cross_entropy_with_logits(labels=valid_y_batch[x], logits=self.valid_models[-1][x]) for x in range(self.num_tasks)]
-            self.test_loss = [tf.nn.softmax_cross_entropy_with_logits(labels=test_y_batch[x], logits=self.test_models[-1][x]) for x in range(self.num_tasks)]
-        else:
-            self.train_eval = [self.train_models[-1][x] for x in range(self.num_tasks)]
-            self.valid_eval = [self.valid_models[-1][x] for x in range(self.num_tasks)]
-            self.test_eval = [self.test_models[-1][x] for x in range(self.num_tasks)]
-
-            self.train_loss = [2.0* tf.nn.l2_loss(self.train_eval[x]-train_y_batch[x]) for x in range(self.num_tasks)]
-            self.train_loss_and_reg = [self.train_loss[x] + reg_term1 + reg_term2 for x in range(self.num_tasks)]
-            self.valid_loss = [2.0* tf.nn.l2_loss(self.valid_eval[x]-valid_y_batch[x]) for x in range(self.num_tasks)]
-            self.test_loss = [2.0* tf.nn.l2_loss(self.test_eval[x]-test_y_batch[x]) for x in range(self.num_tasks)]
+        self.train_eval, self.valid_eval, self.test_eval, self.train_loss, self.valid_loss, self.test_loss, self.train_accuracy, self.valid_accuracy, self.test_accuracy = mtl_model_output_functions([self.train_models, self.valid_models, self.test_models], [train_y_batch, valid_y_batch, test_y_batch], num_tasks, self.layers_size[-1], classification)
+        self.train_loss_and_reg = [self.train_loss[x] + reg_term1 + reg_term2 for x in range(self.num_tasks)]
 
         self.update = [tf.train.RMSPropOptimizer(learning_rate=self.learn_rate/(1.0+self.epoch/self.learn_rate_decay)).minimize(self.train_loss_and_reg[x]) for x in range(self.num_tasks)]
-
-        #### functions only for classification problem
-        if classification and self.layers_size[-1]<2:
-            self.train_accuracy = [tf.reduce_sum(tf.cast(tf.equal((self.train_eval[x]>0.5), (train_y_batch[x]>0.5)), tf.float32)) for x in range(self.num_tasks)]
-            self.valid_accuracy = [tf.reduce_sum(tf.cast(tf.equal((self.valid_eval[x]>0.5), (valid_y_batch[x]>0.5)), tf.float32)) for x in range(self.num_tasks)]
-            self.test_accuracy = [tf.reduce_sum(tf.cast(tf.equal((self.test_eval[x]>0.5), (test_y_batch[x]>0.5)), tf.float32)) for x in range(self.num_tasks)]
-
-        elif classification:
-            self.train_accuracy = [tf.reduce_sum(tf.cast(tf.equal(tf.argmax(self.train_eval[x], 1), tf.argmax(train_y_batch[x], 1)), tf.float32)) for x in range(self.num_tasks)]
-            self.valid_accuracy = [tf.reduce_sum(tf.cast(tf.equal(tf.argmax(self.valid_eval[x], 1), tf.argmax(valid_y_batch[x], 1)), tf.float32)) for x in range(self.num_tasks)]
-            self.test_accuracy = [tf.reduce_sum(tf.cast(tf.equal(tf.argmax(self.test_eval[x], 1), tf.argmax(test_y_batch[x], 1)), tf.float32)) for x in range(self.num_tasks)]
-
