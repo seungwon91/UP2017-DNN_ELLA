@@ -155,10 +155,6 @@ class MTL_FFNN_minibatch():
 class MTL_FFNN_HPS_minibatch():
     def __init__(self, num_tasks, dim_layers, batch_size, learning_rate, learning_rate_decay, data_list, classification=False):
         self.num_tasks = num_tasks
-        #self.num_layers = [len(dim_layers[0])-1, (len(dim_layers[1])//self.num_tasks)]
-        #self.shared_layers_size = dim_layers[0]      ## include input dimension
-        #self.independent_layers_size = dim_layers[1] ## assume depth of task-specific nets are same
-
         self.shared_layers_size = dim_layers[0]
         self.task_specific_layers_size = dim_layers[1]
         self.num_layers = [len(self.shared_layers_size)-1] + [len(self.task_specific_layers_size[x]) for x in range(self.num_tasks)]
