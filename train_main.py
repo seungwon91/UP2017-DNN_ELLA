@@ -49,18 +49,15 @@ def train_main(model_architecture, model_hyperpara, train_hyperpara, save_result
 
     ###########################################################################
     #######################  DELETE THIS  #####################################
+    ''' ## test for single-task FFNN
     train_x, train_y = train_data[0][0][0], train_data[0][0][1]
     valid_x, valid_y = validation_data[0][0][0], validation_data[0][0][1]
     test_x, test_y = test_data[0][0], test_data[0][1]
     num_train, num_valid, num_test = num_train[0], num_valid[0], num_test[0]
     num_task=1
-    #######################  DELETE THIS  #####################################
-    ###########################################################################
-
-
-
-
-
+    '''
+    train_data, validation_data = train_data[0], validation_data[0]
+    
     ### Set hyperparameter related to training process
     learning_rate = train_hyperpara['lr']
     learning_rate_decay = train_hyperpara['lr_decay']
@@ -68,6 +65,12 @@ def train_main(model_architecture, model_hyperpara, train_hyperpara, save_result
     improvement_threshold = train_hyperpara['improvement_threshold']
     patience = train_hyperpara['patience']
     patience_multiplier = train_hyperpara['patience_multiplier']
+    
+    #######################  DELETE THIS  #####################################
+    ###########################################################################
+
+
+
 
 
     ### Generate Model
@@ -89,8 +92,7 @@ def train_main(model_architecture, model_hyperpara, train_hyperpara, save_result
     elif model_architecture is 'mtl_ffnn_hard_para_sharing':
         print "Training MTL-FFNN model (Hard Parameter Sharing Ver.)"
         ts_layer_dim_tmp = model_hyperpara['task_specific_layer']
-        task_specific_layer_dimension = sum([[ts_layer_dim_tmp[x] for _ in range(num_task)] for x in range(len(ts_layer_dim_tmp))], [])
-        layers_dimension = [[x_dim]+model_hyperpara['hidden_layer'], task_specific_layer_dimension+[y_dim for _ in range(num_task)]]
+        layers_dimension = [[x_dim]+model_hyperpara['hidden_layer'], [ts_layer_dim_tmp[x]+[y_dim] for x in range(num_task)]]
         batch_size = model_hyperpara['batch_size']
         learning_model = MTL_FFNN_HPS_minibatch(num_tasks=num_task, dim_layers=layers_dimension, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=[train_data, validation_data, test_data], classification=classification_prob)
     elif model_architecture is 'mtl_ffnn_tensorfactor':
@@ -422,4 +424,3 @@ def train_main(model_architecture, model_hyperpara, train_hyperpara, save_result
         savemat(result_file_name, result_summary)
 
     return (end_time-start_time, best_epoch, abs(best_valid_error), abs(test_error_at_best_epoch))
-
