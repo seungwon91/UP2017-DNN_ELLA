@@ -57,7 +57,13 @@ def train_main(model_architecture, model_hyperpara, train_hyperpara, save_result
     num_task=1
     '''
     train_data, validation_data = train_data[0], validation_data[0]
-    
+    #######################  DELETE THIS  #####################################
+    ###########################################################################
+
+
+
+
+
     ### Set hyperparameter related to training process
     learning_rate = train_hyperpara['lr']
     learning_rate_decay = train_hyperpara['lr_decay']
@@ -65,12 +71,6 @@ def train_main(model_architecture, model_hyperpara, train_hyperpara, save_result
     improvement_threshold = train_hyperpara['improvement_threshold']
     patience = train_hyperpara['patience']
     patience_multiplier = train_hyperpara['patience_multiplier']
-    
-    #######################  DELETE THIS  #####################################
-    ###########################################################################
-
-
-
 
 
     ### Generate Model
