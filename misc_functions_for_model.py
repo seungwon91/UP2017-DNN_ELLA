@@ -17,7 +17,7 @@ def tflized_data(data_list, do_MTL, num_tasks=0):
         test_y = tf.constant(data_list[5], dtype=tf.float32)
     else:
         #### multi-task
-        if self.num_tasks < 2:
+        if num_tasks < 2:
             train_x = [tf.constant(data_list[0], dtype=tf.float32)]
             train_y = [tf.constant(data_list[1], dtype=tf.float32)]
             valid_x = [tf.constant(data_list[2], dtype=tf.float32)]
@@ -123,31 +123,36 @@ def new_fc_layer(layer_input, input_dim, output_dim, activation_fn=tf.nn.relu, w
     return layer, [weight, bias]
 
 #### function to generate network of fully-connected layers
-def new_fc_net(net_input, num_hiddens, activation_fn=tf.nn.relu, params=None, output_type=None):
+####      'dim_layers' contains input/output layer
+def new_fc_net(net_input, dim_layers, activation_fn=tf.nn.relu, params=None, output_type=None):
     if params is None:
         layers, params = [], []
-        for cnt in range(len(num_hiddens)-1):
+        for cnt in range(len(dim_layers)-1):
             if cnt == 0:
-                layer_tmp, para_tmp = new_fc_layer(net_input, num_hiddens[0], num_hiddens[1], activation_fn=activation_fn)
-            elif cnt == len(num_hiddens)-2 and output_type is 'classification':
-                layer_tmp, para_tmp = new_fc_layer(layers[cnt-1], num_hiddens[cnt], num_hiddens[cnt+1], activation_fn='classification')
-            elif cnt == len(num_hiddens)-2:
-                layer_tmp, para_tmp = new_fc_layer(layers[cnt-1], num_hiddens[cnt], num_hiddens[cnt+1], activation_fn=None)
+                layer_tmp, para_tmp = new_fc_layer(net_input, dim_layers[0], dim_layers[1], activation_fn=activation_fn)
+            elif cnt == len(dim_layers)-2 and output_type is 'classification':
+                layer_tmp, para_tmp = new_fc_layer(layers[cnt-1], dim_layers[cnt], dim_layers[cnt+1], activation_fn='classification')
+            elif cnt == len(dim_layers)-2 and output_type is None:
+                layer_tmp, para_tmp = new_fc_layer(layers[cnt-1], dim_layers[cnt], dim_layers[cnt+1], activation_fn=None)
+            elif cnt == len(dim_layers)-2 and output_type is 'same':
+                layer_tmp, para_tmp = new_fc_layer(layers[cnt-1], dim_layers[cnt], dim_layers[cnt+1], activation_fn=activation_fn)
             else:
-                layer_tmp, para_tmp = new_fc_layer(layers[cnt-1], num_hiddens[cnt], num_hiddens[cnt+1], activation_fn=activation_fn)
+                layer_tmp, para_tmp = new_fc_layer(layers[cnt-1], dim_layers[cnt], dim_layers[cnt+1], activation_fn=activation_fn)
             layers.append(layer_tmp)
             params = params + para_tmp
     else:
         layers = []
-        for cnt in range(len(num_hiddens)-1):
+        for cnt in range(len(dim_layers)-1):
             if cnt == 0:
-                layer_tmp, _ = new_fc_layer(net_input, num_hiddens[0], num_hiddens[1], activation_fn=activation_fn, weight=params[0], bias=params[1])
-            elif cnt == len(num_hiddens)-2 and output_type is 'classification':
-                layer_tmp, _ = new_fc_layer(layers[cnt-1], num_hiddens[cnt], num_hiddens[cnt+1], activation_fn='classification', weight=params[2*cnt], bias=params[2*cnt+1])
-            elif cnt == len(num_hiddens)-2:
-                layer_tmp, _ = new_fc_layer(layers[cnt-1], num_hiddens[cnt], num_hiddens[cnt+1], activation_fn=None, weight=params[2*cnt], bias=params[2*cnt+1])
+                layer_tmp, _ = new_fc_layer(net_input, dim_layers[0], dim_layers[1], activation_fn=activation_fn, weight=params[0], bias=params[1])
+            elif cnt == len(dim_layers)-2 and output_type is 'classification':
+                layer_tmp, _ = new_fc_layer(layers[cnt-1], dim_layers[cnt], dim_layers[cnt+1], activation_fn='classification', weight=params[2*cnt], bias=params[2*cnt+1])
+            elif cnt == len(dim_layers)-2 and output_type is None:
+                layer_tmp, _ = new_fc_layer(layers[cnt-1], dim_layers[cnt], dim_layers[cnt+1], activation_fn=None, weight=params[2*cnt], bias=params[2*cnt+1])
+            elif cnt == len(dim_layers)-2 and output_type is 'same':
+                layer_tmp, _ = new_fc_layer(layers[cnt-1], dim_layers[cnt], dim_layers[cnt+1], activation_fn=activation_fn, weight=params[2*cnt], bias=params[2*cnt+1])
             else:
-                layer_tmp, _ = new_fc_layer(layers[cnt-1], num_hiddens[cnt], num_hiddens[cnt+1], activation_fn=activation_fn, weight=params[2*cnt], bias=params[2*cnt+1])
+                layer_tmp, _ = new_fc_layer(layers[cnt-1], dim_layers[cnt], dim_layers[cnt+1], activation_fn=activation_fn, weight=params[2*cnt], bias=params[2*cnt+1])
             layers.append(layer_tmp)
     return (layers, params)
 
