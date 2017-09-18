@@ -53,6 +53,25 @@ def minibatched_data(data_list, batch_size, data_index, do_MTL, num_tasks=0):
         test_y_batch = [tf.slice(data_list[5][x], [batch_size * data_index, 0], [batch_size, -1]) for x in range(num_tasks)]
     return (train_x_batch, train_y_batch, valid_x_batch, valid_y_batch, test_x_batch, test_y_batch)
 
+def minibatched_cnn_data(data_list, batch_size, data_index, data_tensor_dim, do_MTL, num_tasks=0):
+    if not do_MTL:
+        #### single task
+        train_x_batch = tf.reshape(tf.slice(data_list[0], [batch_size*data_index, 0], [batch_size, -1]), data_tensor_dim)
+        train_y_batch = tf.slice(data_list[1], [batch_size*data_index, 0], [batch_size, -1])
+        valid_x_batch = tf.reshape(tf.slice(data_list[2], [batch_size*data_index, 0], [batch_size, -1]), data_tensor_dim)
+        valid_y_batch = tf.slice(data_list[3], [batch_size*data_index, 0], [batch_size, -1])
+        test_x_batch = tf.reshape(tf.slice(data_list[4], [batch_size*data_index, 0], [batch_size, -1]), data_tensor_dim)
+        test_y_batch = tf.slice(data_list[5], [batch_size*data_index, 0], [batch_size, -1])
+    else:
+        #### multi-task
+        train_x_batch = [tf.reshape(tf.slice(data_list[0][x], [batch_size*data_index, 0], [batch_size, -1]), data_tensor_dim) for x in range(num_tasks)]
+        train_y_batch = [tf.slice(data_list[1][x], [batch_size*data_index, 0], [batch_size, -1]) for x in range(num_tasks)]
+        valid_x_batch = [tf.reshape(tf.slice(data_list[2][x], [batch_size*data_index, 0], [batch_size, -1]), data_tensor_dim) for x in range(num_tasks)]
+        valid_y_batch = [tf.slice(data_list[3][x], [batch_size*data_index, 0], [batch_size, -1]) for x in range(num_tasks)]
+        test_x_batch = [tf.reshape(tf.slice(data_list[4][x], [batch_size*data_index, 0], [batch_size, -1]), data_tensor_dim) for x in range(num_tasks)]
+        test_y_batch = [tf.slice(data_list[5][x], [batch_size*data_index, 0], [batch_size, -1]) for x in range(num_tasks)]
+    return (train_x_batch, train_y_batch, valid_x_batch, valid_y_batch, test_x_batch, test_y_batch)
+
 
 ############################################
 #### functions for (MTL) model's output ####
@@ -249,7 +268,12 @@ def new_cnn_net(net_input, k_sizes, ch_sizes, stride_sizes, activation_fn=tf.nn.
         layers.append(tf.nn.dropout(layers[-1], dropout_prob))
     return (layers, params, output_dim)
 
+#### function to generate network of cnn->ffnn
+def new_cnn_fc_net(net_input, k_sizes, ch_sizes, stride_sizes, fc_sizes, cnn_activation_fn=tf.nn.relu, cnn_params=None, fc_activation_fn=tf.nn.relu, fc_params=None, padding_type='SAME', max_pool=False, pool_sizes=None, dropout=False, dropout_prob=None, input_size=[0, 0], output_type=None):
+    cnn_model, cnn_params, cnn_output_dim = new_cnn_net(net_input, k_sizes, ch_sizes, stride_sizes, activation_fn=cnn_activation_fn, params=cnn_params, padding_type=padding_type, max_pool=max_pool, pool_sizes=pool_sizes, dropout=dropout, dropout_prob=dropout_prob, flat_output=True, input_size=input_size)
 
+    fc_model, fc_params = new_fc_net(cnn_model[-1], [cnn_output_dim[0]]+fc_sizes, activation_fn=fc_activation_fn, params=fc_params, output_type=output_type)
+    return (cnn_model+fc_model, cnn_params, fc_params)
 
 
 ############################################
