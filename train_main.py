@@ -14,6 +14,112 @@ from ffnn_ella_model import ELLA_FFNN_simple_minibatch, ELLA_FFNN_linear_relatio
 from cnn_baseline_model import CNN_batch, CNN_minibatch
 
 
+def model_generation(model_architecture, model_hyperpara, train_hyperpara, data_info, classification_prob=False, data_list=None):
+    learning_model, gen_model_success = None, True
+    learning_rate = train_hyperpara['lr']
+    learning_rate_decay = train_hyperpara['lr_decay']
+
+    if len(data_info) == 2:
+        x_dim, y_dim = data_info
+    elif len(data_info) == 3:
+        x_dim, y_dim, num_task = data_info
+
+    if model_architecture is 'ffnn_batch':
+        print "Training batch FFNN model"
+        layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
+        learning_model = FFNN_batch(dim_layers=layers_dimension, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, classification=classification_prob)
+    elif model_architecture is 'cnn_batch':
+        print "Training batch CNN-FC model"
+        cnn_kernel_size, cnn_kernel_stride, cnn_channel_size = model_hyperpara['kernel_sizes'], model_hyperpara['stride_sizes'], model_hyperpara['channel_sizes']
+        cnn_padding, cnn_pooling, cnn_dropout = model_hyperpara['padding_type'], model_hyperpara['max_pooling'], model_hyperpara['dropout']
+        if cnn_pooling:
+            cnn_pool_size = model_hyperpara['pooling_size']
+        else:
+            cnn_pool_size = None
+        fc_hidden_size = model_hyperpara['hidden_layer'] + [y_dim]
+        input_img_size = model_hyperpara['image_dimension']
+        learning_model = CNN_batch(dim_channels=cnn_channel_size, dim_fcs=fc_hidden_size, dim_img=input_img_size, dim_kernel=cnn_kernel_size, dim_strides=cnn_kernel_stride, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, padding_type=cnn_padding, max_pooling=cnn_pooling, dim_pool=cnn_pool_size, dropout=cnn_dropout)
+    elif model_architecture is 'ffnn_minibatch':
+        print "Training mini-batch FFNN model"
+        layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
+        batch_size = model_hyperpara['batch_size']
+        learning_model = FFNN_minibatch(dim_layers=layers_dimension, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=data_list, classification=classification_prob)
+    elif model_architecture is 'cnn_minibatch':
+        print "Training mini-batch CNN-FC model"
+        cnn_kernel_size, cnn_kernel_stride, cnn_channel_size = model_hyperpara['kernel_sizes'], model_hyperpara['stride_sizes'], model_hyperpara['channel_sizes']
+        cnn_padding, cnn_pooling, cnn_dropout = model_hyperpara['padding_type'], model_hyperpara['max_pooling'], model_hyperpara['dropout']
+        if cnn_pooling:
+            cnn_pool_size = model_hyperpara['pooling_size']
+        else:
+            cnn_pool_size = None
+        fc_hidden_size = model_hyperpara['hidden_layer'] + [y_dim]
+        batch_size = model_hyperpara['batch_size']
+        input_img_size = model_hyperpara['image_dimension']
+        learning_model = CNN_minibatch(dim_channels=cnn_channel_size, dim_fcs=fc_hidden_size, dim_img=input_img_size, dim_kernel=cnn_kernel_size, dim_strides=cnn_kernel_stride, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=data_list, padding_type=cnn_padding, max_pooling=cnn_pooling, dim_pool=cnn_pool_size, dropout=cnn_dropout)
+    elif model_architecture is 'mtl_ffnn_mini_batch':
+        print "Training MTL-FFNN model (Single NN ver.)"
+        layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
+        batch_size = model_hyperpara['batch_size']
+        learning_model = MTL_FFNN_minibatch(num_tasks=num_task, dim_layers=layers_dimension, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=data_list, classification=classification_prob)
+    elif model_architecture is 'mtl_ffnn_hard_para_sharing':
+        print "Training MTL-FFNN model (Hard Parameter Sharing Ver.)"
+        ts_layer_dim_tmp = model_hyperpara['task_specific_layer']
+        layers_dimension = [[x_dim]+model_hyperpara['hidden_layer'], [ts_layer_dim_tmp[x]+[y_dim] for x in range(num_task)]]
+        batch_size = model_hyperpara['batch_size']
+        learning_model = MTL_FFNN_HPS_minibatch(num_tasks=num_task, dim_layers=layers_dimension, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=data_list, classification=classification_prob)
+    elif model_architecture is 'mtl_ffnn_tensorfactor':
+        print "Training MTL-FFNN model (ver. tensor factorization)"
+        layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
+        know_base_dimension = model_hyperpara['knowledge_base']
+        batch_size = model_hyperpara['batch_size']
+        regularization_scale = model_hyperpara['regularization_scale']
+        learning_model = MTL_FFNN_tensorfactor_minibatch(num_tasks=num_task, dim_layers=layers_dimension, dim_know_base=know_base_dimension, reg_scale=regularization_scale, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=data_list, classification=classification_prob)
+    elif model_architecture is 'ELLA_ffnn_simple':
+        print "Training ELLA-FFNN model (ver. simple)"
+        layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
+        know_base_dimension = model_hyperpara['knowledge_base']
+        batch_size = model_hyperpara['batch_size']
+        regularization_scale = model_hyperpara['regularization_scale']
+        learning_model = ELLA_simple_FFNN_minibatch(num_tasks=num_task, dim_layers=layers_dimension, dim_know_base=know_base_dimension, reg_scale=regularization_scale, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=data_list, classification=classification_prob)
+    elif model_architecture is 'ELLA_ffnn_linear_relation':
+        print "Training ELLA-FFNN model (ver. linear relation from KB to TS)"
+        layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
+        know_base_dimension = model_hyperpara['knowledge_base']
+        batch_size = model_hyperpara['batch_size']
+        regularization_scale = model_hyperpara['regularization_scale']
+        learning_model = ELLA_FFNN_linear_relation_minibatch(num_tasks=num_task, dim_layers=layers_dimension, dim_know_base=know_base_dimension, reg_scale=regularization_scale, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=data_list, classification=classification_prob)
+    elif model_architecture is 'ELLA_FFNN_linear_relation2':
+        print "Training ELLA-FFNN model (ver. 2-layer linear relation from KB to TS)"
+        layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
+        know_base_dimension = model_hyperpara['knowledge_base']
+        task_specific_dimension = model_hyperpara['task_specific']
+        batch_size = model_hyperpara['batch_size']
+        regularization_scale = model_hyperpara['regularization_scale']
+        learning_model = ELLA_FFNN_linear_relation_minibatch2(num_tasks=num_task, dim_layers=layers_dimension, dim_know_base=know_base_dimension, dim_task_specific=task_specific_dimension, reg_scale=regularization_scale, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=data_list, classification=classification_prob)
+    elif model_architecture is 'ELLA_ffnn_nonlinear_relation':
+        print "Training ELLA-FFNN model (ver. NON-linear relation from KB to TS)"
+        layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
+        know_base_dimension = model_hyperpara['knowledge_base']
+        batch_size = model_hyperpara['batch_size']
+        regularization_scale = model_hyperpara['regularization_scale']
+        learning_model = ELLA_FFNN_nonlinear_relation_minibatch(num_tasks=num_task, dim_layers=layers_dimension, dim_know_base=know_base_dimension, reg_scale=regularization_scale, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=data_list, classification=classification_prob)
+    elif model_architecture is 'ELLA_ffnn_nonlinear_relation2':
+        print "Training ELLA-FFNN model (ver. 2-layer NON-linear relation from KB to TS)"
+        layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
+        know_base_dimension = model_hyperpara['knowledge_base']
+        task_specific_dimension = model_hyperpara['task_specific']
+        batch_size = model_hyperpara['batch_size']
+        regularization_scale = model_hyperpara['regularization_scale']
+        learning_model = ELLA_FFNN_nonlinear_relation_minibatch2(num_tasks=num_task, dim_layers=layers_dimension, dim_know_base=know_base_dimension, dim_task_specific=task_specific_dimension, reg_scale=regularization_scale, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=data_list, classification=classification_prob)
+    else:
+        print "No such model exists!!"
+        print "No such model exists!!"
+        print "No such model exists!!"
+        gen_model_success = False
+    return (learning_model, gen_model_success)
+
+
+
 def train_main(model_architecture, model_hyperpara, train_hyperpara, save_result, data_type, data_file_name, data_hyperpara, result_folder_name=None, useGPU=False, GPU_device=0):
     ### control log of TensorFlow
     os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
@@ -49,14 +155,17 @@ def train_main(model_architecture, model_hyperpara, train_hyperpara, save_result
 
     ###########################################################################
     #######################  DELETE THIS  #####################################
-    ''' ## test for single-task FFNN
+    ## for test single-task
     train_x, train_y = train_data[0][0][0], train_data[0][0][1]
     valid_x, valid_y = validation_data[0][0][0], validation_data[0][0][1]
     test_x, test_y = test_data[0][0], test_data[0][1]
+    data_for_model = [train_x, train_y, valid_x, valid_y, test_x, test_y]
     num_train, num_valid, num_test = num_train[0], num_valid[0], num_test[0]
     num_task=1
-    '''
-    train_data, validation_data = train_data[0], validation_data[0]
+
+    ## for test multi-task
+    ##train_data, validation_data = train_data[0], validation_data[0]
+    ##data_for_model = [train_data, validation_data, test_data]
     #######################  DELETE THIS  #####################################
     ###########################################################################
 
@@ -65,86 +174,19 @@ def train_main(model_architecture, model_hyperpara, train_hyperpara, save_result
 
 
     ### Set hyperparameter related to training process
-    learning_rate = train_hyperpara['lr']
-    learning_rate_decay = train_hyperpara['lr_decay']
     learning_step_max = train_hyperpara['learning_step_max']
     improvement_threshold = train_hyperpara['improvement_threshold']
     patience = train_hyperpara['patience']
     patience_multiplier = train_hyperpara['patience_multiplier']
+    if 'batch_size' in model_hyperpara:
+        batch_size = model_hyperpara['batch_size']
 
 
     ### Generate Model
     classification_prob = (data_type is 'mnist')
-    if model_architecture is 'ffnn_batch':
-        print "Training batch FFNN model"
-        layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
-        learning_model = FFNN_batch(dim_layers=layers_dimension, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, classification=classification_prob)
-    elif model_architecture is 'ffnn_minibatch':
-        print "Training mini-batch (tensorflow constant based) FFNN model"
-        layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
-        batch_size = model_hyperpara['batch_size']
-        learning_model = FFNN_minibatch(dim_layers=layers_dimension, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=[train_x, train_y, valid_x, valid_y, test_x, test_y], classification=classification_prob)
-    elif model_architecture is 'mtl_ffnn_mini_batch':
-        print "Training MTL-FFNN model (Single NN ver.)"
-        layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
-        batch_size = model_hyperpara['batch_size']
-        learning_model = MTL_FFNN_minibatch(num_tasks=num_task, dim_layers=layers_dimension, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=[train_data, validation_data, test_data], classification=classification_prob)
-    elif model_architecture is 'mtl_ffnn_hard_para_sharing':
-        print "Training MTL-FFNN model (Hard Parameter Sharing Ver.)"
-        ts_layer_dim_tmp = model_hyperpara['task_specific_layer']
-        layers_dimension = [[x_dim]+model_hyperpara['hidden_layer'], [ts_layer_dim_tmp[x]+[y_dim] for x in range(num_task)]]
-        batch_size = model_hyperpara['batch_size']
-        learning_model = MTL_FFNN_HPS_minibatch(num_tasks=num_task, dim_layers=layers_dimension, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=[train_data, validation_data, test_data], classification=classification_prob)
-    elif model_architecture is 'mtl_ffnn_tensorfactor':
-        print "Training MTL-FFNN model (ver. tensor factorization)"
-        layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
-        know_base_dimension = model_hyperpara['knowledge_base']
-        batch_size = model_hyperpara['batch_size']
-        regularization_scale = model_hyperpara['regularization_scale']
-        learning_model = MTL_FFNN_tensorfactor_minibatch(num_tasks=num_task, dim_layers=layers_dimension, dim_know_base=know_base_dimension, reg_scale=regularization_scale, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=[train_data, validation_data, test_data], classification=classification_prob)
-    elif model_architecture is 'ELLA_ffnn_simple':
-        print "Training ELLA-FFNN model (ver. simple)"
-        layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
-        know_base_dimension = model_hyperpara['knowledge_base']
-        batch_size = model_hyperpara['batch_size']
-        regularization_scale = model_hyperpara['regularization_scale']
-        learning_model = ELLA_simple_FFNN_minibatch(num_tasks=num_task, dim_layers=layers_dimension, dim_know_base=know_base_dimension, reg_scale=regularization_scale, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=[train_data, validation_data, test_data], classification=classification_prob)
-    elif model_architecture is 'ELLA_ffnn_linear_relation':
-        print "Training ELLA-FFNN model (ver. linear relation from KB to TS)"
-        layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
-        know_base_dimension = model_hyperpara['knowledge_base']
-        batch_size = model_hyperpara['batch_size']
-        regularization_scale = model_hyperpara['regularization_scale']
-        learning_model = ELLA_FFNN_linear_relation_minibatch(num_tasks=num_task, dim_layers=layers_dimension, dim_know_base=know_base_dimension, reg_scale=regularization_scale, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=[train_data, validation_data, test_data], classification=classification_prob)
-    elif model_architecture is 'ELLA_FFNN_linear_relation2':
-        print "Training ELLA-FFNN model (ver. 2-layer linear relation from KB to TS)"
-        layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
-        know_base_dimension = model_hyperpara['knowledge_base']
-        task_specific_dimension = model_hyperpara['task_specific']
-        batch_size = model_hyperpara['batch_size']
-        regularization_scale = model_hyperpara['regularization_scale']
-        learning_model = ELLA_FFNN_linear_relation_minibatch2(num_tasks=num_task, dim_layers=layers_dimension, dim_know_base=know_base_dimension, dim_task_specific=task_specific_dimension, reg_scale=regularization_scale, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=[train_data, validation_data, test_data], classification=classification_prob)
-    elif model_architecture is 'ELLA_ffnn_nonlinear_relation':
-        print "Training ELLA-FFNN model (ver. NON-linear relation from KB to TS)"
-        layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
-        know_base_dimension = model_hyperpara['knowledge_base']
-        batch_size = model_hyperpara['batch_size']
-        regularization_scale = model_hyperpara['regularization_scale']
-        learning_model = ELLA_FFNN_nonlinear_relation_minibatch(num_tasks=num_task, dim_layers=layers_dimension, dim_know_base=know_base_dimension, reg_scale=regularization_scale, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=[train_data, validation_data, test_data], classification=classification_prob)
-    elif model_architecture is 'ELLA_ffnn_nonlinear_relation2':
-        print "Training ELLA-FFNN model (ver. 2-layer NON-linear relation from KB to TS)"
-        layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
-        know_base_dimension = model_hyperpara['knowledge_base']
-        task_specific_dimension = model_hyperpara['task_specific']
-        batch_size = model_hyperpara['batch_size']
-        regularization_scale = model_hyperpara['regularization_scale']
-        learning_model = ELLA_FFNN_nonlinear_relation_minibatch2(num_tasks=num_task, dim_layers=layers_dimension, dim_know_base=know_base_dimension, dim_task_specific=task_specific_dimension, reg_scale=regularization_scale, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=[train_data, validation_data, test_data], classification=classification_prob)
-    else:
-        print "No such model exists!!"
-        print "No such model exists!!"
-        print "No such model exists!!"
+    learning_model, generation_success = model_generation(model_architecture, model_hyperpara, train_hyperpara, [x_dim, y_dim, num_task], classification_prob=classification_prob, data_list=data_for_model)
+    if not generation_success:
         return (None, None, None, None)
-
 
 
     ### Training Procedure
@@ -240,13 +282,13 @@ def train_main(model_architecture, model_hyperpara, train_hyperpara, save_result
 
             elif model_architecture is 'cnn_batch':
                 #### batch CNN for single task
-                sess.run(learning_model.update, feed_dict={learning_model.model_input:train_x, learning_model.true_output:train_y, learning_model.epoch:learning_step-1})
+                sess.run(learning_model.update, feed_dict={learning_model.model_input:train_x, learning_model.true_output:train_y, learning_model.epoch:learning_step-1, learning_model.dropout_prob:0.5})
 
-                train_error_tmp = sess.run(learning_model.accuracy, feed_dict={learning_model.model_input:train_x, learning_model.true_output:train_y})
+                train_error_tmp = sess.run(learning_model.accuracy, feed_dict={learning_model.model_input:train_x, learning_model.true_output:train_y, learning_model.dropout_prob:1.0})
 
-                validation_error_tmp = sess.run(learning_model.accuracy, feed_dict={learning_model.model_input:valid_x, learning_model.true_output:valid_y})
+                validation_error_tmp = sess.run(learning_model.accuracy, feed_dict={learning_model.model_input:valid_x, learning_model.true_output:valid_y, learning_model.dropout_prob:1.0})
 
-                test_error_tmp = sess.run(learning_model.accuracy, feed_dict={learning_model.model_input:test_x, learning_model.true_output:test_y})
+                test_error_tmp = sess.run(learning_model.accuracy, feed_dict={learning_model.model_input:test_x, learning_model.true_output:test_y, learning_model.dropout_prob:1.0})
 
                 train_error, valid_error, test_error = -train_error_tmp/num_train, -validation_error_tmp/num_valid, -test_error_tmp/num_test
 
@@ -254,19 +296,19 @@ def train_main(model_architecture, model_hyperpara, train_hyperpara, save_result
                 #### mini-batch CNN for single task
                 shuffle(indices)
                 for batch_cnt in range(num_train//batch_size):
-                    sess.run(learning_model.update, feed_dict={learning_model.data_index:indices[0][batch_cnt], learning_model.epoch:learning_step-1})
+                    sess.run(learning_model.update, feed_dict={learning_model.data_index:indices[0][batch_cnt], learning_model.epoch:learning_step-1, learning_model.dropout_prob:0.5})
 
                 train_error_tmp = 0.0
                 for batch_cnt in range(num_train//batch_size):
-                    train_error_tmp = train_error_tmp + sess.run(learning_model.train_accuracy, feed_dict={learning_model.data_index:batch_cnt})
+                    train_error_tmp = train_error_tmp + sess.run(learning_model.train_accuracy, feed_dict={learning_model.data_index:batch_cnt, learning_model.dropout_prob:1.0})
 
                 validation_error_tmp = 0.0
                 for batch_cnt in range(num_valid//batch_size):
-                    validation_error_tmp = validation_error_tmp + sess.run(learning_model.valid_accuracy, feed_dict={learning_model.data_index:batch_cnt})
+                    validation_error_tmp = validation_error_tmp + sess.run(learning_model.valid_accuracy, feed_dict={learning_model.data_index:batch_cnt, learning_model.dropout_prob:1.0})
 
                 test_error_tmp = 0.0
                 for batch_cnt in range(num_test//batch_size):
-                    test_error_tmp = test_error_tmp + sess.run(learning_model.test_accuracy, feed_dict={learning_model.data_index:batch_cnt})
+                    test_error_tmp = test_error_tmp + sess.run(learning_model.test_accuracy, feed_dict={learning_model.data_index:batch_cnt, learning_model.dropout_prob:1.0})
 
                 train_error, valid_error, test_error = -train_error_tmp/num_train, -validation_error_tmp/num_valid, -test_error_tmp/num_test
 
