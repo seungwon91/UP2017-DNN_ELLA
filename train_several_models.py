@@ -44,13 +44,19 @@ def print_to_txt(txt_file_name, model_architecture, model_hyperpara, train_time,
 
 # input arguments : data_type, data_file_name, data_hyperpara, model_architecture, model_hyperpara, train_hyperpara, save_result, result_folder_name=None
 
-# model_architecture : 'ffnn_batch', 'ffnn_minibatch', 'mtl_ffnn_mini_batch', 'mtl_ffnn_hard_para_sharing', 'ELLA_ffnn_simple', 'ELLA_ffnn_tensorfactor'
+# model_architecture : 'ffnn_batch', 'ffnn_minibatch', 'mtl_ffnn_mini_batch', 'mtl_ffnn_hard_para_sharing', 'ELLA_ffnn_simple', 'ELLA_ffnn_tensorfactor', 'cnn_batch', 'cnn_minibatch'
 
 # model_architecutre 'ffnn_batch'
 #       model_hyperpara : 'hidden_layer'
 #       train_hyperpara : 'lr', 'learning_step_max', 'improvement_threshold', 'patience', 'patience_multiplier'
+# model_architecutre 'cnn_batch'
+#       model_hyperpara : 'hidden_layer', 'kernel_sizes', 'stride_sizes', 'channel_sizes', 'padding_type', 'max_pooling', 'pooling_size', 'dropout', 'image_dimension'
+#       train_hyperpara : 'lr', 'learning_step_max', 'improvement_threshold', 'patience', 'patience_multiplier'
 # model_architecutre 'ffnn_minibatch'
 #       model_hyperpara : 'hidden_layer', 'batch_size'
+#       train_hyperpara : 'lr', 'learning_step_max', 'improvement_threshold', 'patience', 'patience_multiplier'
+# model_architecutre 'cnn_minibatch'
+#       model_hyperpara : 'hidden_layer', 'kernel_sizes', 'stride_sizes', 'channel_sizes', 'padding_type', 'max_pooling', 'pooling_size', 'dropout', 'image_dimension', 'batch_size'
 #       train_hyperpara : 'lr', 'learning_step_max', 'improvement_threshold', 'patience', 'patience_multiplier'
 # model_architecutre 'mtl_ffnn_mini_batch'
 #       model_hyperpara : 'hidden_layer', 'batch_size'
@@ -109,12 +115,22 @@ train_hyperpara['patience_multiplier'] = 3
 
 
 #### Training one model
-model_architecture = 'ffnn_batch'
+model_architecture = 'cnn_minibatch'
 model_hyperpara = {}
 model_hyperpara['hidden_layer'] = [32, 16, 1]
 model_hyperpara['batch_size'] = 20
+model_hyperpara['kernel_sizes'] = [5, 5, 4, 4]
+model_hyperpara['stride_sizes'] = [1, 1, 1, 1]
+model_hyperpara['channel_sizes'] = [32, 64]
+model_hyperpara['padding_type'] = 'SAME'
+model_hyperpara['max_pooling'] = True
+model_hyperpara['pooling_size'] = [2, 2, 2, 2]
+model_hyperpara['dropout'] = True
+model_hyperpara['image_dimension'] = [28, 28, 1]
 train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
 reset_default_graph()
+
+
 
 
 
