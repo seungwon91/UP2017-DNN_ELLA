@@ -9,8 +9,8 @@ from misc_functions_for_model import *
 class CNN_batch():
     def __init__(self, dim_channels, dim_fcs, dim_img, dim_kernel, dim_strides, learning_rate, learning_rate_decay, padding_type='SAME', max_pooling=False, dim_pool=None, dropout=False):
         #### num_layers == len(channels_size) + len(fc_size) && len(fc_size) >= 1
-        self.num_layers = len(dim_channels) + len(dim_fcs)-1
-        self.cnn_channels_size = dim_channels    ## include dim of input channel
+        self.num_layers = len(dim_channels) + len(dim_fcs)
+        self.cnn_channels_size = [dim_img[-1]]+dim_channels    ## include dim of input channel
         self.cnn_kernel_size = dim_kernel     ## len(kernel_size) == 2*len(channels_size-1)
         self.cnn_stride_size = dim_strides
         self.pool_size = dim_pool      ## len(pool_size) == 2*len(channels_size-1)
@@ -51,9 +51,9 @@ class CNN_batch():
 #### Convolutional & Fully-connected Neural Net
 class CNN_minibatch():
     def __init__(self, dim_channels, dim_fcs, dim_img, dim_kernel, dim_strides, batch_size, learning_rate, learning_rate_decay, data_list, padding_type='SAME', max_pooling=False, dim_pool=None, dropout=False):
-        #### num_layers == len(channels_size) + len(fc_size) -1 && len(fc_size) >= 1
-        self.num_layers = len(dim_channels) + len(dim_fcs)-1
-        self.cnn_channels_size = dim_channels    ## include dim of input channel
+        #### num_layers == len(channels_size) + len(fc_size) && len(fc_size) >= 1
+        self.num_layers = len(dim_channels) + len(dim_fcs)
+        self.cnn_channels_size = [dim_img[-1]]+dim_channels    ## include dim of input channel
         self.cnn_kernel_size = dim_kernel     ## len(kernel_size) == 2*(len(channels_size)-1)
         self.cnn_stride_size = dim_strides
         self.pool_size = dim_pool      ## len(pool_size) == 2*(len(channels_size)-1)
