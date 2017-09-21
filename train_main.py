@@ -11,7 +11,7 @@ from scipy.io import savemat, loadmat
 from gen_data import sine_data, sine_plus_linear_data, mnist_data, mnist_data_print_info
 from ffnn_baseline_model import FFNN_batch, FFNN_minibatch, MTL_FFNN_minibatch, MTL_FFNN_HPS_minibatch, MTL_FFNN_tensorfactor_minibatch
 from ffnn_ella_model import ELLA_FFNN_simple_minibatch, ELLA_FFNN_linear_relation_minibatch, ELLA_FFNN_linear_relation_minibatch2, ELLA_FFNN_nonlinear_relation_minibatch, ELLA_FFNN_nonlinear_relation_minibatch2
-from cnn_baseline_model import CNN_batch, CNN_minibatch
+from cnn_baseline_model import CNN_batch, CNN_minibatch, MTL_CNN_minibatch
 
 
 def model_generation(model_architecture, model_hyperpara, train_hyperpara, data_info, classification_prob=False, data_list=None):
@@ -24,39 +24,17 @@ def model_generation(model_architecture, model_hyperpara, train_hyperpara, data_
     elif len(data_info) == 3:
         x_dim, y_dim, num_task = data_info
 
+    ###### FFNN models
     if model_architecture is 'ffnn_batch':
         print "Training batch FFNN model"
         layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
         learning_model = FFNN_batch(dim_layers=layers_dimension, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, classification=classification_prob)
-    elif model_architecture is 'cnn_batch':
-        print "Training batch CNN-FC model"
-        cnn_kernel_size, cnn_kernel_stride, cnn_channel_size = model_hyperpara['kernel_sizes'], model_hyperpara['stride_sizes'], model_hyperpara['channel_sizes']
-        cnn_padding, cnn_pooling, cnn_dropout = model_hyperpara['padding_type'], model_hyperpara['max_pooling'], model_hyperpara['dropout']
-        if cnn_pooling:
-            cnn_pool_size = model_hyperpara['pooling_size']
-        else:
-            cnn_pool_size = None
-        fc_hidden_size = model_hyperpara['hidden_layer'] + [y_dim]
-        input_img_size = model_hyperpara['image_dimension']
-        learning_model = CNN_batch(dim_channels=cnn_channel_size, dim_fcs=fc_hidden_size, dim_img=input_img_size, dim_kernel=cnn_kernel_size, dim_strides=cnn_kernel_stride, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, padding_type=cnn_padding, max_pooling=cnn_pooling, dim_pool=cnn_pool_size, dropout=cnn_dropout)
     elif model_architecture is 'ffnn_minibatch':
         print "Training mini-batch FFNN model"
         layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
         batch_size = model_hyperpara['batch_size']
         learning_model = FFNN_minibatch(dim_layers=layers_dimension, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=data_list, classification=classification_prob)
-    elif model_architecture is 'cnn_minibatch':
-        print "Training mini-batch CNN-FC model"
-        cnn_kernel_size, cnn_kernel_stride, cnn_channel_size = model_hyperpara['kernel_sizes'], model_hyperpara['stride_sizes'], model_hyperpara['channel_sizes']
-        cnn_padding, cnn_pooling, cnn_dropout = model_hyperpara['padding_type'], model_hyperpara['max_pooling'], model_hyperpara['dropout']
-        if cnn_pooling:
-            cnn_pool_size = model_hyperpara['pooling_size']
-        else:
-            cnn_pool_size = None
-        fc_hidden_size = model_hyperpara['hidden_layer'] + [y_dim]
-        batch_size = model_hyperpara['batch_size']
-        input_img_size = model_hyperpara['image_dimension']
-        learning_model = CNN_minibatch(dim_channels=cnn_channel_size, dim_fcs=fc_hidden_size, dim_img=input_img_size, dim_kernel=cnn_kernel_size, dim_strides=cnn_kernel_stride, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=data_list, padding_type=cnn_padding, max_pooling=cnn_pooling, dim_pool=cnn_pool_size, dropout=cnn_dropout)
-    elif model_architecture is 'mtl_ffnn_mini_batch':
+    elif model_architecture is 'mtl_ffnn_minibatch':
         print "Training MTL-FFNN model (Single NN ver.)"
         layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
         batch_size = model_hyperpara['batch_size']
@@ -88,7 +66,7 @@ def model_generation(model_architecture, model_hyperpara, train_hyperpara, data_
         batch_size = model_hyperpara['batch_size']
         regularization_scale = model_hyperpara['regularization_scale']
         learning_model = ELLA_FFNN_linear_relation_minibatch(num_tasks=num_task, dim_layers=layers_dimension, dim_know_base=know_base_dimension, reg_scale=regularization_scale, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=data_list, classification=classification_prob)
-    elif model_architecture is 'ELLA_FFNN_linear_relation2':
+    elif model_architecture is 'ELLA_ffnn_linear_relation2':
         print "Training ELLA-FFNN model (ver. 2-layer linear relation from KB to TS)"
         layers_dimension = [x_dim] + model_hyperpara['hidden_layer'] + [y_dim]
         know_base_dimension = model_hyperpara['knowledge_base']
@@ -111,13 +89,48 @@ def model_generation(model_architecture, model_hyperpara, train_hyperpara, data_
         batch_size = model_hyperpara['batch_size']
         regularization_scale = model_hyperpara['regularization_scale']
         learning_model = ELLA_FFNN_nonlinear_relation_minibatch2(num_tasks=num_task, dim_layers=layers_dimension, dim_know_base=know_base_dimension, dim_task_specific=task_specific_dimension, reg_scale=regularization_scale, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=data_list, classification=classification_prob)
+    ###### CNN models
+    elif model_architecture is 'cnn_batch':
+        print "Training batch CNN-FC model"
+        cnn_kernel_size, cnn_kernel_stride, cnn_channel_size = model_hyperpara['kernel_sizes'], model_hyperpara['stride_sizes'], model_hyperpara['channel_sizes']
+        cnn_padding, cnn_pooling, cnn_dropout = model_hyperpara['padding_type'], model_hyperpara['max_pooling'], model_hyperpara['dropout']
+        if cnn_pooling:
+            cnn_pool_size = model_hyperpara['pooling_size']
+        else:
+            cnn_pool_size = None
+        fc_hidden_size = model_hyperpara['hidden_layer'] + [y_dim]
+        input_img_size = model_hyperpara['image_dimension']
+        learning_model = CNN_batch(dim_channels=cnn_channel_size, dim_fcs=fc_hidden_size, dim_img=input_img_size, dim_kernel=cnn_kernel_size, dim_strides=cnn_kernel_stride, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, padding_type=cnn_padding, max_pooling=cnn_pooling, dim_pool=cnn_pool_size, dropout=cnn_dropout)
+    elif model_architecture is 'cnn_minibatch':
+        print "Training mini-batch CNN-FC model"
+        cnn_kernel_size, cnn_kernel_stride, cnn_channel_size = model_hyperpara['kernel_sizes'], model_hyperpara['stride_sizes'], model_hyperpara['channel_sizes']
+        cnn_padding, cnn_pooling, cnn_dropout = model_hyperpara['padding_type'], model_hyperpara['max_pooling'], model_hyperpara['dropout']
+        if cnn_pooling:
+            cnn_pool_size = model_hyperpara['pooling_size']
+        else:
+            cnn_pool_size = None
+        fc_hidden_size = model_hyperpara['hidden_layer'] + [y_dim]
+        batch_size = model_hyperpara['batch_size']
+        input_img_size = model_hyperpara['image_dimension']
+        learning_model = CNN_minibatch(dim_channels=cnn_channel_size, dim_fcs=fc_hidden_size, dim_img=input_img_size, dim_kernel=cnn_kernel_size, dim_strides=cnn_kernel_stride, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=data_list, padding_type=cnn_padding, max_pooling=cnn_pooling, dim_pool=cnn_pool_size, dropout=cnn_dropout)
+    elif model_architecture is 'mtl_cnn_minibatch':
+        print "Training MTL-CNN model (Single NN ver.)"
+        cnn_kernel_size, cnn_kernel_stride, cnn_channel_size = model_hyperpara['kernel_sizes'], model_hyperpara['stride_sizes'], model_hyperpara['channel_sizes']
+        cnn_padding, cnn_pooling, cnn_dropout = model_hyperpara['padding_type'], model_hyperpara['max_pooling'], model_hyperpara['dropout']
+        if cnn_pooling:
+            cnn_pool_size = model_hyperpara['pooling_size']
+        else:
+            cnn_pool_size = None
+        fc_hidden_size = model_hyperpara['hidden_layer'] + [y_dim]
+        batch_size = model_hyperpara['batch_size']
+        input_img_size = model_hyperpara['image_dimension']
+        learning_model = MTL_CNN_minibatch(dim_channels=cnn_channel_size, num_tasks=num_task, dim_fcs=fc_hidden_size, dim_img=input_img_size, dim_kernel=cnn_kernel_size, dim_strides=cnn_kernel_stride, batch_size=batch_size, learning_rate=learning_rate, learning_rate_decay=learning_rate_decay, data_list=data_list, padding_type=cnn_padding, max_pooling=cnn_pooling, dim_pool=cnn_pool_size, dropout=cnn_dropout)
     else:
         print "No such model exists!!"
         print "No such model exists!!"
         print "No such model exists!!"
         gen_model_success = False
     return (learning_model, gen_model_success)
-
 
 
 def train_main(model_architecture, model_hyperpara, train_hyperpara, save_result, data_type, data_file_name, data_hyperpara, result_folder_name=None, useGPU=False, GPU_device=0):
@@ -155,6 +168,7 @@ def train_main(model_architecture, model_hyperpara, train_hyperpara, save_result
 
     ###########################################################################
     #######################  DELETE THIS  #####################################
+    '''
     ## for test single-task
     train_x, train_y = train_data[0][0][0], train_data[0][0][1]
     valid_x, valid_y = validation_data[0][0][0], validation_data[0][0][1]
@@ -162,10 +176,11 @@ def train_main(model_architecture, model_hyperpara, train_hyperpara, save_result
     data_for_model = [train_x, train_y, valid_x, valid_y, test_x, test_y]
     num_train, num_valid, num_test = num_train[0], num_valid[0], num_test[0]
     num_task=1
+    '''
 
     ## for test multi-task
-    ##train_data, validation_data = train_data[0], validation_data[0]
-    ##data_for_model = [train_data, validation_data, test_data]
+    train_data, validation_data = train_data[0], validation_data[0]
+    data_for_model = [train_data, validation_data, test_data]
     #######################  DELETE THIS  #####################################
     ###########################################################################
 
@@ -312,53 +327,49 @@ def train_main(model_architecture, model_hyperpara, train_hyperpara, save_result
 
                 train_error, valid_error, test_error = -train_error_tmp/num_train, -validation_error_tmp/num_valid, -test_error_tmp/num_test
 
-            elif (model_architecture is 'mtl_ffnn_mini_batch') or (model_architecture is 'mtl_ffnn_hard_para_sharing') or (model_architecture is 'mtl_ffnn_tensorfactor') or (model_architecture is 'ELLA_ffnn_simple') or (model_architecture is 'ELLA_ffnn_linear_relation') or (model_architecture is 'ELLA_FFNN_linear_relation2') or (model_architecture is 'ELLA_ffnn_nonlinear_relation') or (model_architecture is 'ELLA_ffnn_nonlinear_relation2'):
+            elif (model_architecture is 'mtl_ffnn_minibatch') or (model_architecture is 'mtl_ffnn_hard_para_sharing') or (model_architecture is 'mtl_ffnn_tensorfactor') or (model_architecture is 'ELLA_ffnn_simple') or (model_architecture is 'ELLA_ffnn_linear_relation') or (model_architecture is 'ELLA_ffnn_linear_relation2') or (model_architecture is 'ELLA_ffnn_nonlinear_relation') or (model_architecture is 'ELLA_ffnn_nonlinear_relation2') or (model_architecture is 'mtl_cnn_minibatch'):
                 #### Multi-task models
                 task_for_train = np.random.randint(0, num_task)
                 shuffle(indices[task_for_train])
                 for batch_cnt in range(num_train[task_for_train]//batch_size):
-                    sess.run(learning_model.update[task_for_train], feed_dict={learning_model.data_index:indices[task_for_train][batch_cnt], learning_model.epoch:learning_step-1})
+                    if 'cnn' in model_architecture:
+                        sess.run(learning_model.update[task_for_train], feed_dict={learning_model.data_index:indices[task_for_train][batch_cnt], learning_model.epoch:learning_step-1, learning_model.dropout_prob:0.6})
+                    else:
+                        sess.run(learning_model.update[task_for_train], feed_dict={learning_model.data_index:indices[task_for_train][batch_cnt], learning_model.epoch:learning_step-1})
+
+                train_error_tmp = [0.0 for _ in range(num_task)]
+                validation_error_tmp = [0.0 for _ in range(num_task)]
+                test_error_tmp = [0.0 for _ in range(num_task)]
+                for task_cnt in range(num_task):
+                    if classification_prob:
+                        model_train_error, model_valid_error, model_test_error = learning_model.train_accuracy[task_cnt], learning_model.valid_accuracy[task_cnt], learning_model.test_accuracy[task_cnt]
+                    else:
+                        model_train_error, model_valid_error, model_test_error = learning_model.train_loss[task_cnt], learning_model.valid_loss[task_cnt], learning_model.test_loss[task_cnt]
+
+                    for batch_cnt in range(num_train[task_cnt]//batch_size):
+                        if 'cnn' in model_architecture:
+                            train_error_tmp[task_cnt] = train_error_tmp[task_cnt] + sess.run(model_train_error, feed_dict={learning_model.data_index:batch_cnt, learning_model.dropout_prob:1.0})
+                        else:
+                            train_error_tmp[task_cnt] = train_error_tmp[task_cnt] + sess.run(model_train_error, feed_dict={learning_model.data_index:batch_cnt})
+                    train_error_tmp[task_cnt] = train_error_tmp[task_cnt]/num_train[task_cnt]
+
+                    for batch_cnt in range(num_valid[task_cnt]//batch_size):
+                        if 'cnn' in model_architecture:
+                            validation_error_tmp[task_cnt] = validation_error_tmp[task_cnt] + sess.run(model_valid_error, feed_dict={learning_model.data_index:batch_cnt, learning_model.dropout_prob:1.0})
+                        else:
+                            validation_error_tmp[task_cnt] = validation_error_tmp[task_cnt] + sess.run(model_valid_error, feed_dict={learning_model.data_index:batch_cnt})
+                    validation_error_tmp[task_cnt] = validation_error_tmp[task_cnt]/num_valid[task_cnt]
+
+                    for batch_cnt in range(num_test[task_cnt]//batch_size):
+                        if 'cnn' in model_architecture:
+                            test_error_tmp[task_cnt] = test_error_tmp[task_cnt] + sess.run(model_test_error, feed_dict={learning_model.data_index:batch_cnt, learning_model.dropout_prob:1.0})
+                        else:
+                            test_error_tmp[task_cnt] = test_error_tmp[task_cnt] + sess.run(model_test_error, feed_dict={learning_model.data_index:batch_cnt})
+                    test_error_tmp[task_cnt] = test_error_tmp[task_cnt]/num_test[task_cnt]
 
                 if classification_prob:
-                    #### it is accuracy, not error
-                    train_error_tmp = [0.0 for _ in range(num_task)]
-                    for task_cnt in range(num_task):
-                        for batch_cnt in range(num_train[task_cnt]//batch_size):
-                            train_error_tmp[task_cnt] = train_error_tmp[task_cnt] + sess.run(learning_model.train_accuracy[task_cnt], feed_dict={learning_model.data_index:batch_cnt})
-                        train_error_tmp[task_cnt] = train_error_tmp[task_cnt]/num_train[task_cnt]
-
-                    validation_error_tmp = [0.0 for _ in range(num_task)]
-                    for task_cnt in range(num_task):
-                        for batch_cnt in range(num_valid[task_cnt]//batch_size):
-                            validation_error_tmp[task_cnt] = validation_error_tmp[task_cnt] + sess.run(learning_model.valid_accuracy[task_cnt], feed_dict={learning_model.data_index:batch_cnt})
-                        validation_error_tmp[task_cnt] = validation_error_tmp[task_cnt]/num_valid[task_cnt]
-
-                    test_error_tmp = [0.0 for _ in range(num_task)]
-                    for task_cnt in range(num_task):
-                        for batch_cnt in range(num_test[task_cnt]//batch_size):
-                            test_error_tmp[task_cnt] = test_error_tmp[task_cnt] + sess.run(learning_model.test_accuracy[task_cnt], feed_dict={learning_model.data_index:batch_cnt})
-                        test_error_tmp[task_cnt] = test_error_tmp[task_cnt]/num_test[task_cnt]
-
                     train_error, valid_error, test_error = -(sum(train_error_tmp)/num_task), -(sum(validation_error_tmp)/num_task), -(sum(test_error_tmp)/num_task)
                 else:
-                    train_error_tmp = [0.0 for _ in range(num_task)]
-                    for task_cnt in range(num_task):
-                        for batch_cnt in range(num_train[task_cnt]//batch_size):
-                            train_error_tmp[task_cnt] = train_error_tmp[task_cnt] + sess.run(learning_model.train_loss[task_cnt], feed_dict={learning_model.data_index:batch_cnt})
-                        train_error_tmp[task_cnt] = train_error_tmp[task_cnt]/num_train[task_cnt]
-
-                    validation_error_tmp = [0.0 for _ in range(num_task)]
-                    for task_cnt in range(num_task):
-                        for batch_cnt in range(num_valid[task_cnt]//batch_size):
-                            validation_error_tmp[task_cnt] = validation_error_tmp[task_cnt] + sess.run(learning_model.valid_loss[task_cnt], feed_dict={learning_model.data_index:batch_cnt})
-                        validation_error_tmp[task_cnt] = validation_error_tmp[task_cnt]/num_valid[task_cnt]
-
-                    test_error_tmp = [0.0 for _ in range(num_task)]
-                    for task_cnt in range(num_task):
-                        for batch_cnt in range(num_test[task_cnt]//batch_size):
-                            test_error_tmp[task_cnt] = test_error_tmp[task_cnt] + sess.run(learning_model.test_loss[task_cnt], feed_dict={learning_model.data_index:batch_cnt})
-                        test_error_tmp[task_cnt] = test_error_tmp[task_cnt]/num_test[task_cnt]
-
                     train_error, valid_error, test_error = np.sqrt(train_error_tmp/num_task), np.sqrt(validation_error_tmp/num_task), np.sqrt(test_error_tmp/num_task)
 
             #### current parameter of model
