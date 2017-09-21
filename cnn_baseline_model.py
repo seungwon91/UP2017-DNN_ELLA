@@ -3,7 +3,7 @@ import tensorflow as tf
 from misc_functions_for_model import *
 
 #################################################
-############       Simple CNN       #############
+#########       Simple CNN batch       ##########
 #################################################
 #### Convolutional & Fully-connected Neural Net
 class CNN_batch():
@@ -46,7 +46,7 @@ class CNN_batch():
 
 
 #################################################
-############       Simple CNN       #############
+#######      Simple CNN mini-batch       ########
 #################################################
 #### Convolutional & Fully-connected Neural Net
 class CNN_minibatch():
@@ -93,4 +93,61 @@ class CNN_minibatch():
 
         #self.update = tf.train.RMSPropOptimizer(learning_rate=self.learn_rate).minimize(self.loss)
         self.update = tf.train.RMSPropOptimizer(learning_rate=self.learn_rate/(1.0+self.epoch/self.learn_rate_decay)).minimize(self.train_loss)
-        #self.update = tf.train.AdamOptimizer(learning_rate=self.learn_rate/(1.0+self.epoch/self.learn_rate_decay)).minimize(self.train_loss)
+
+
+########################################################
+####     Single CNN + FC for Multi-task Learning    ####
+########################################################
+#### Convolutional & Fully-connected Neural Net
+class MTL_CNN_minibatch():
+    def __init__(self, num_tasks, dim_channels, dim_fcs, dim_img, dim_kernel, dim_strides, batch_size, learning_rate, learning_rate_decay, data_list, padding_type='SAME', max_pooling=False, dim_pool=None, dropout=False):
+        self.num_tasks = num_tasks
+        #### num_layers == len(channels_size) + len(fc_size) && len(fc_size) >= 1
+        self.num_layers = len(dim_channels) + len(dim_fcs)
+        self.cnn_channels_size = [dim_img[-1]]+dim_channels    ## include dim of input channel
+        self.cnn_kernel_size = dim_kernel     ## len(kernel_size) == 2*(len(channels_size)-1)
+        self.cnn_stride_size = dim_strides
+        self.pool_size = dim_pool      ## len(pool_size) == 2*(len(channels_size)-1)
+        self.fc_size = dim_fcs
+        self.image_size = dim_img    ## img_width * img_height * img_channel
+        self.learn_rate = learning_rate
+        self.learn_rate_decay = learning_rate_decay
+        self.batch_size = batch_size
+
+        #### data
+        self.data = tflized_data(data_list, do_MTL=True, num_tasks=self.num_tasks)
+
+        #### placeholder of model
+        self.data_index = tf.placeholder(dtype=tf.int32)
+        self.epoch = tf.placeholder(dtype=tf.float32)
+        self.dropout_prob = tf.placeholder(dtype=tf.float32)
+
+        #### mini-batch for training/validation/test data
+        train_x_batch, train_y_batch, valid_x_batch, valid_y_batch, test_x_batch, test_y_batch = minibatched_cnn_data(self.data, self.batch_size, self.data_index, [-1]+self.image_size, do_MTL=True, num_tasks=self.num_tasks)
+
+        #### layers of model for train data
+        self.train_models = []
+        for task_cnt in range(self.num_tasks):
+            if task_cnt == 0:
+                model_tmp, self.cnn_param, self.fc_param = new_cnn_fc_net(train_x_batch[task_cnt], self.cnn_kernel_size, self.cnn_channels_size, self.cnn_stride_size, self.fc_size, cnn_params=None, fc_params=None, padding_type=padding_type, max_pool=max_pooling, pool_sizes=dim_pool, dropout=dropout, dropout_prob=self.dropout_prob, input_size=self.image_size[0:2], output_type='classification')
+            else:
+                model_tmp, _, _ = new_cnn_fc_net(train_x_batch[task_cnt], self.cnn_kernel_size, self.cnn_channels_size, self.cnn_stride_size, self.fc_size, cnn_params=self.cnn_param, fc_params=self.fc_param, padding_type=padding_type, max_pool=max_pooling, pool_sizes=dim_pool, dropout=dropout, dropout_prob=self.dropout_prob, input_size=self.image_size[0:2], output_type='classification')
+            self.train_models.append(model_tmp)
+        self.param = self.cnn_param + self.fc_param
+
+        #### layers of model for validation data
+        self.valid_models = []
+        for task_cnt in range(self.num_tasks):
+            model_tmp, _, _ = new_cnn_fc_net(valid_x_batch[task_cnt], self.cnn_kernel_size, self.cnn_channels_size, self.cnn_stride_size, self.fc_size, cnn_params=self.cnn_param, fc_params=self.fc_param, padding_type=padding_type, max_pool=max_pooling, pool_sizes=dim_pool, dropout=dropout, dropout_prob=self.dropout_prob, input_size=self.image_size[0:2], output_type='classification')
+            self.valid_models.append(model_tmp)
+
+        #### layers of model for test data
+        self.test_models = []
+        for task_cnt in range(self.num_tasks):
+            model_tmp, _, _ = new_cnn_fc_net(test_x_batch[task_cnt], self.cnn_kernel_size, self.cnn_channels_size, self.cnn_stride_size, self.fc_size, cnn_params=self.cnn_param, fc_params=self.fc_param, padding_type=padding_type, max_pool=max_pooling, pool_sizes=dim_pool, dropout=dropout, dropout_prob=self.dropout_prob, input_size=self.image_size[0:2], output_type='classification')
+            self.test_models.append(model_tmp)
+
+        #### functions of model
+        self.train_eval, self.valid_eval, self.test_eval, self.train_loss, self.valid_loss, self.test_loss, self.train_accuracy, self.valid_accuracy, self.test_accuracy = mtl_model_output_functions([self.train_models, self.valid_models, self.test_models], [train_y_batch, valid_y_batch, test_y_batch], self.num_tasks, self.fc_size[-1], classification=True)
+
+        self.update = [tf.train.RMSPropOptimizer(learning_rate=self.learn_rate/(1.0+self.epoch/self.learn_rate_decay)).minimize(self.train_loss[x]) for x in range(self.num_tasks)]
