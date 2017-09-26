@@ -1,15 +1,17 @@
 from os import listdir, getcwd, mkdir
+from os.path import isfile
 from math import sqrt
 
-from numpy import inf
+from scipy.io import loadmat, savemat
+import numpy as np
 from tensorflow import reset_default_graph
 
+from gen_data import sine_data, sine_plus_linear_data, mnist_data, mnist_data_print_info
 from train_main import train_main
 
 
 def mean_of_list(list_input):
     return float(sum(list_input))/len(list_input)
-
 def stddev_of_list(list_input):
     list_mean = mean_of_list(list_input)
     sq_err = [(x-list_mean)**2 for x in list_input]
@@ -17,29 +19,91 @@ def stddev_of_list(list_input):
         return 0.0
     else:
         return sqrt(sum(sq_err)/float(len(list_input)-1))
-    
 
-def print_to_txt(txt_file_name, model_architecture, model_hyperpara, train_time, best_epoch, best_valid_error, best_test_error):
-    if model_architecture is 'ffnn_batch':
-        model_summary = "Model : %s\nHidden : %s\n" %(model_architecture, str(model_hyperpara['hidden_layer']))
-    elif (model_architecture is 'ffnn_minibatch') or (model_architecture is 'mtl_ffnn_mini_batch'):
-        model_summary = "Model : %s\nHidden : %s\n" %(model_architecture, str(model_hyperpara['hidden_layer']))
-    elif (model_architecture is 'mtl_ffnn_hard_para_sharing'):
-        model_summary = "Model : %s\nHidden : %s\tTask Specific : %s\n" %(model_architecture, str(model_hyperpara['hidden_layer']), str(model_hyperpara['task_specific_layer']))
-    elif (model_architecture is 'ELLA_ffnn_simple') or (model_architecture is 'mtl_ffnn_tensorfactor') or (model_architecture is 'ELLA_ffnn_linear_relation') or (model_architecture is 'ELLA_ffnn_nonlinear_relation'):
-        model_summary = "Model : %s\nHidden : %s\tKB : %s\tReg Scale : %s\n" %(model_architecture, str(model_hyperpara['hidden_layer']), str(model_hyperpara['knowledge_base']), str(model_hyperpara['regularization_scale']))
-    elif (model_architecture is 'ELLA_FFNN_linear_relation2') or (model_architecture is 'ELLA_ffnn_nonlinear_relation2'):
-        model_summary = "Model : %s\nHidden : %s\tKB : %s\tTS : %s\tReg Scale : %s\n" %(model_architecture, str(model_hyperpara['hidden_layer']), str(model_hyperpara['knowledge_base']), str(model_hyperpara['task_specific']), str(model_hyperpara['regularization_scale']))
 
-    #result_summary = "Time consumption for training : %.2f\nBest validation/test error : %.4f/ %.4f (at epoch %d)\n\n" %(train_time, best_valid_error, best_test_error, best_epoch)
-    #result_summary = "Time consumption for training : %.2f (%.3f)\nBest validation/test error : %.4f (%.4f)/ %.4f (%.4f)\n\n" %(mean_of_list(train_time), stddev_of_list(train_time), mean_of_list(best_valid_error), stddev_of_list(best_valid_error), mean_of_list(best_test_error), stddev_of_list(best_test_error))
-    result_summary = "Time consumption for training : %.2f (%.3f)\nBest validation/test error : %.4f / %.4f\nMean validation/test error : %.4f (%.4f)/ %.4f (%.4f)\n\n" %(mean_of_list(train_time), stddev_of_list(train_time), max(best_valid_error), max(best_test_error), mean_of_list(best_valid_error), stddev_of_list(best_valid_error), mean_of_list(best_test_error), stddev_of_list(best_test_error))
+def reformat_result_for_mat(model_architecture, model_hyperpara, train_hyperpara, result_from_train_run, data_group_list):
+    result_of_curr_run, tmp_dict = {}, {}
+    #### 'model_specific_info' element
+    tmp_dict['architecture'] = model_architecture
+    tmp_dict['learning_rate'] = train_hyperpara['lr']
+    tmp_dict['improvement_threshold'] = train_hyperpara['improvement_threshold']
+    tmp_dict['early_stopping_para'] = [train_hyperpara['patience'], train_hyperpara['patience_multiplier']]
 
-    if not ('txt_result' in listdir(getcwd())):
-        mkdir('./txt_result')
+    tmp_dict['batch_size'] = model_hyperpara['batch_size']
+    tmp_dict['hidden_layer'] = model_hyperpara['hidden_layer']
+    if model_architecture is 'mtl_ffnn_hard_para_sharing':
+        tmp_dict['task_specific_layer'] = model_hyperpara['task_specific_layer']
+    if ('mtl' in model_architecture and 'tensorfactor' in model_architecture) or ('ELLA' in model_architecture and ('simple' in model_architecture or 'relation' in model_architecture)):
+        tmp_dict['knowledge_base'] = model_hyperpara['knowledge_base']
+        tmp_dict['regularization_scale'] = model_hyperpara['regularization_scale']
+    if ('ELLA' in model_architecture and 'relation2' in model_architecture):
+        tmp_dict['task_specific'] = model_hyperpara['task_specific']
+    if ('cnn' in model_architecture):
+        tmp_dict['kernel_sizes'] = model_hyperpara['kernel_sizes']
+        tmp_dict['stride_sizes'] = model_hyperpara['stride_sizes']
+        tmp_dict['channel_sizes'] = model_hyperpara['channel_sizes']
+        tmp_dict['padding_type'] = model_hyperpara['padding_type']
+        tmp_dict['max_pooling'] = model_hyperpara['max_pooling']
+        tmp_dict['pooling_size'] = model_hyperpara['pooling_size']
+        tmp_dict['dropout'] = model_hyperpara['dropout']
+        tmp_dict['image_dimension'] = model_hyperpara['image_dimension']
+    result_of_curr_run['model_specific_info'] = tmp_dict
 
-    with open('./txt_result/' + txt_file_name, 'a') as fobj:
-        fobj.write(model_summary+result_summary)
+    num_run_per_model, best_valid_error_list, best_test_error_list = train_hyperpara['num_run_per_model'], [], []
+    result_of_curr_run['result_of_each_run'] = np.zeros((num_run_per_model,), dtype=np.object)
+    for cnt in range(num_run_per_model):
+        result_of_curr_run['result_of_each_run'][cnt] = result_from_train_run[cnt]
+        best_valid_error_list.append(result_from_train_run[cnt]['best_validation_error'])
+        best_test_error_list.append(result_from_train_run[cnt]['test_error_at_best_epoch'])
+
+    result_of_curr_run['best_valid_error'] = best_valid_error_list
+    result_of_curr_run['best_valid_error_mean'] = mean_of_list(best_valid_error_list)
+    result_of_curr_run['best_valid_error_stddev'] = stddev_of_list(best_valid_error_list)
+    result_of_curr_run['best_test_error'] = best_test_error_list
+    result_of_curr_run['best_test_error_mean'] = mean_of_list(best_test_error_list)
+    result_of_curr_run['best_test_error_stddev'] = stddev_of_list(best_test_error_list)
+    result_of_curr_run['train_valid_data_group'] = data_group_list
+
+    return result_of_curr_run
+
+
+def train_run_for_each_model(model_architecture, model_hyperpara, train_hyperpara, dataset, data_type, num_data_group, mat_file_name, classification_prob, saved_result=None, useGPU=False, GPU_device=0):
+    if not 'Result' in listdir(getcwd()):
+        mkdir('Result')
+
+    #### process results of previous training
+    if (saved_result is None) and not (isfile('./Result/'+mat_file_name)):
+        saved_result = np.zeros((1,), dtype=np.object)
+    elif (saved_result is None):
+        saved_result_tmp = loadmat('./Result/'+mat_file_name)
+        num_prev_test_model = len(saved_result_tmp['training_summary'][0])
+        saved_result = np.zeros((num_prev_test_model+1,), dtype=np.object)
+        for cnt in range(num_prev_test_model):
+            saved_result[cnt] = saved_result_tmp['training_summary'][0][cnt]
+    else:
+        num_prev_result, prev_result_tmp = len(saved_result), saved_result
+        saved_result = np.zeros((num_prev_result+1,), dtype=np.object)
+        for cnt in range(num_prev_result):
+            saved_result[cnt] = prev_result_tmp[cnt]
+
+    #### run training procedure with different dataset
+    max_run_cnt = train_hyperpara['num_run_per_model']
+    group_cnt = np.random.randint(0, num_data_group, size=max_run_cnt)
+    result_from_train_run = []
+    for run_cnt in range(max_run_cnt):
+        #group_cnt = np.random.randint(0, num_data_group, size=1)[0]
+        train_result_tmp = train_main(model_architecture, model_hyperpara, train_hyperpara, [dataset[0][group_cnt[run_cnt]], dataset[1][group_cnt[run_cnt]], dataset[2]], data_type, classification_prob, useGPU, GPU_device)
+        result_from_train_run.append(train_result_tmp)
+        print "%d-th training run\n\n" % (run_cnt+1)
+        reset_default_graph()
+
+    #### save training summary
+    result_of_curr_run = reformat_result_for_mat(model_architecture, model_hyperpara, train_hyperpara, result_from_train_run, train_data_group_list)
+    saved_result[-1] = result_of_curr_run
+    savemat('./Result/'+mat_file_name, {'training_summary':saved_result})
+
+    return saved_result
+
 
 
 # input arguments : data_type, data_file_name, data_hyperpara, model_architecture, model_hyperpara, train_hyperpara, save_result, result_folder_name=None
@@ -89,23 +153,40 @@ def print_to_txt(txt_file_name, model_architecture, model_hyperpara, train_time,
 
 
 use_gpu, gpu_device_num = True, 0
+mat_file_name = 'training_result1.mat'
 
-num_run = 11
 
-#result_txt_name = 'comparison_of_relation_btw_KB_and_TS(trD80).txt'
-result_txt_name = 'delete_this1.txt'
+
+
 data_type = 'mnist'
 data_hyperpara = {}
 data_hyperpara['num_train_data'] = 80
 data_hyperpara['num_valid_data'] = 40
 data_hyperpara['num_test_data'] = 1800
+data_hyperpara['num_train_group'] = 25
 #data_file_name = data_type + '_data_ind_split(' + str(data_hyperpara['num_train_data']) + '_' + str(data_hyperpara['num_valid_data']) + '_' + str(data_hyperpara['num_test_data']) + ').pkl'
 #data_file_name = data_type + '_data_(task5_' + str(data_hyperpara['num_train_data']) + '_' + str(data_hyperpara['num_valid_data']) + '_' + str(data_hyperpara['num_test_data']) + ').pkl'
 data_file_name = 'mnist_new_data_testing.pkl'
 
+### Generate/Load Data
+num_train_max, num_valid_max, num_test_max = data_hyperpara['num_train_data'], data_hyperpara['num_valid_data'], data_hyperpara['num_test_data']
+if data_type is 'sine':
+    train_data, validation_data, test_data = sine_data(data_file_name, data_hyperpara['num_task'], data_hyperpara['num_train_data'], data_hyperpara['num_valid_data'], data_hyperpara['num_test_data'], data_hyperpara['param_for_data_generation'])
+    classification_prob=False
+elif data_type is 'sine_plus_linear':
+    train_data, validation_data, test_data = sine_plus_linear_data(data_file_name, data_hyperpara['num_task'], data_hyperpara['num_train_data'], data_hyperpara['num_valid_data'], data_hyperpara['num_test_data'], data_hyperpara['param_for_data_generation'])
+    classification_prob=False
+elif data_type is 'mnist':
+    train_data, validation_data, test_data = mnist_data(data_file_name, data_hyperpara['num_train_data'], data_hyperpara['num_valid_data'], data_hyperpara['num_test_data'], data_hyperpara['num_train_group'])
+    classification_prob=True
 
-save_result = False
+
+
+
+
+
 train_hyperpara = {}
+train_hyperpara['num_run_per_model'] = 5
 train_hyperpara['lr'] = 0.01
 train_hyperpara['lr_decay'] = 100.0
 train_hyperpara['learning_step_max'] = 7500
@@ -119,7 +200,6 @@ train_hyperpara['patience_multiplier'] = 3
 
 
 #### Training one model
-
 model_architecture = 'mtl_cnn_minibatch'
 model_hyperpara = {}
 model_hyperpara['hidden_layer'] = [32, 16, 1]
@@ -132,1677 +212,32 @@ model_hyperpara['max_pooling'] = True
 model_hyperpara['pooling_size'] = [2, 2, 2, 2]
 model_hyperpara['dropout'] = True
 model_hyperpara['image_dimension'] = [28, 28, 1]
-'''
+
+saved_result = train_run_for_each_model(model_architecture, model_hyperpara, train_hyperpara, [train_data, validation_data, test_data], data_type, data_hyperpara['num_train_group'], mat_file_name, classification_prob, saved_result=None, useGPU=use_gpu, GPU_device=gpu_device_num)
+
+
+#### Training one model
 model_architecture = 'mtl_ffnn_minibatch'
 model_hyperpara = {}
 model_hyperpara['hidden_layer'] = [48, 32]
 model_hyperpara['batch_size'] = 20
-'''
-train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-reset_default_graph()
 
-
-
-
-
-'''
-model_architecture = 'ELLA_ffnn_linear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [16, 8, 4]
-model_hyperpara['regularization_scale'] = [0.0, 0.001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "1-1-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [16, 8, 4]
-model_hyperpara['regularization_scale'] = [0.0, 0.001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "1-2-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [16, 8, 4]
-model_hyperpara['task_specific'] = [8, 4, 2]
-model_hyperpara['regularization_scale'] = [0.0, 0.001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "1-3-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [16, 8, 4]
-model_hyperpara['task_specific'] = [16, 8, 4]
-model_hyperpara['regularization_scale'] = [0.0, 0.001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "1-4-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [16, 8, 4]
-model_hyperpara['task_specific'] = [32, 16, 8]
-model_hyperpara['regularization_scale'] = [0.0, 0.001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "1-5-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-
+saved_result = train_run_for_each_model(model_architecture, model_hyperpara, train_hyperpara, [train_data, validation_data, test_data], data_type, data_hyperpara['num_train_group'], mat_file_name, classification_prob, saved_result=None, useGPU=use_gpu, GPU_device=gpu_device_num)
 
 
 
 #### Training one model
-model_architecture = 'ELLA_ffnn_linear_relation'
+model_architecture = 'mtl_cnn_minibatch'
 model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
+model_hyperpara['hidden_layer'] = [32, 16, 1]
 model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [16, 8, 4]
-model_hyperpara['regularization_scale'] = [0.0, 0.0001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "2-1-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [16, 8, 4]
-model_hyperpara['regularization_scale'] = [0.0, 0.0001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "2-2-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [16, 8, 4]
-model_hyperpara['task_specific'] = [8, 4, 2]
-model_hyperpara['regularization_scale'] = [0.0, 0.0001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "2-3-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [16, 8, 4]
-model_hyperpara['task_specific'] = [16, 8, 4]
-model_hyperpara['regularization_scale'] = [0.0, 0.0001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "2-4-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [16, 8, 4]
-model_hyperpara['task_specific'] = [32, 16, 8]
-model_hyperpara['regularization_scale'] = [0.0, 0.0001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "2-5-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-
-
-
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_linear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [16, 8, 4]
-model_hyperpara['regularization_scale'] = [0.0, 0.00001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "3-1-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [16, 8, 4]
-model_hyperpara['regularization_scale'] = [0.0, 0.00001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "3-2-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [16, 8, 4]
-model_hyperpara['task_specific'] = [8, 4, 2]
-model_hyperpara['regularization_scale'] = [0.0, 0.00001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "3-3-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [16, 8, 4]
-model_hyperpara['task_specific'] = [16, 8, 4]
-model_hyperpara['regularization_scale'] = [0.0, 0.00001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "3-4-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [16, 8, 4]
-model_hyperpara['task_specific'] = [32, 16, 8]
-model_hyperpara['regularization_scale'] = [0.0, 0.00001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "3-5-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-
-
-
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_linear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [16, 8, 4]
-model_hyperpara['regularization_scale'] = [0.0, 0.000001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "4-1-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [16, 8, 4]
-model_hyperpara['regularization_scale'] = [0.0, 0.000001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "4-2-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [16, 8, 4]
-model_hyperpara['task_specific'] = [8, 4, 2]
-model_hyperpara['regularization_scale'] = [0.0, 0.000001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "4-3-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [16, 8, 4]
-model_hyperpara['task_specific'] = [16, 8, 4]
-model_hyperpara['regularization_scale'] = [0.0, 0.000001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "4-4-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [16, 8, 4]
-model_hyperpara['task_specific'] = [32, 16, 8]
-model_hyperpara['regularization_scale'] = [0.0, 0.000001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "4-5-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-
-
-###########################################################################################
-###########################################################################################
-###########################################################################################
-###########################################################################################
-
-
-
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_linear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [24, 12]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [12, 6, 3]
-model_hyperpara['regularization_scale'] = [0.0, 0.001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "5-1-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [24, 12]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [12, 6, 3]
-model_hyperpara['regularization_scale'] = [0.0, 0.001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "5-2-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [24, 12]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [12, 6, 3]
-model_hyperpara['task_specific'] = [6, 3, 2]
-model_hyperpara['regularization_scale'] = [0.0, 0.001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "5-3-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [24, 12]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [12, 6, 3]
-model_hyperpara['task_specific'] = [12, 6, 3]
-model_hyperpara['regularization_scale'] = [0.0, 0.001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "5-4-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [24, 12]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [12, 6, 3]
-model_hyperpara['task_specific'] = [24, 12, 6]
-model_hyperpara['regularization_scale'] = [0.0, 0.001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "5-5-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-
-
-
-
-
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_linear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [24, 12]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [12, 6, 3]
-model_hyperpara['regularization_scale'] = [0.0, 0.0001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "6-1-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [24, 12]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [12, 6, 3]
-model_hyperpara['regularization_scale'] = [0.0, 0.0001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "6-2-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [24, 12]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [12, 6, 3]
-model_hyperpara['task_specific'] = [6, 3, 2]
-model_hyperpara['regularization_scale'] = [0.0, 0.0001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "6-3-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [24, 12]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [12, 6, 3]
-model_hyperpara['task_specific'] = [12, 6, 3]
-model_hyperpara['regularization_scale'] = [0.0, 0.0001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "6-4-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [24, 12]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [12, 6, 3]
-model_hyperpara['task_specific'] = [24, 12, 6]
-model_hyperpara['regularization_scale'] = [0.0, 0.0001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "6-5-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-
-
-
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_linear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [24, 12]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [12, 6, 3]
-model_hyperpara['regularization_scale'] = [0.0, 0.00001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "7-1-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [24, 12]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [12, 6, 3]
-model_hyperpara['regularization_scale'] = [0.0, 0.00001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "7-2-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [24, 12]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [12, 6, 3]
-model_hyperpara['task_specific'] = [6, 3, 2]
-model_hyperpara['regularization_scale'] = [0.0, 0.00001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "7-3-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [24, 12]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [12, 6, 3]
-model_hyperpara['task_specific'] = [12, 6, 3]
-model_hyperpara['regularization_scale'] = [0.0, 0.00001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "7-4-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [24, 12]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [12, 6, 3]
-model_hyperpara['task_specific'] = [24, 12, 6]
-model_hyperpara['regularization_scale'] = [0.0, 0.00001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "7-5-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_linear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [24, 12]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [12, 6, 3]
-model_hyperpara['regularization_scale'] = [0.0, 0.000001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "8-1-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [24, 12]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [12, 6, 3]
-model_hyperpara['regularization_scale'] = [0.0, 0.000001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "8-2-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [24, 12]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [12, 6, 3]
-model_hyperpara['task_specific'] = [6, 3, 2]
-model_hyperpara['regularization_scale'] = [0.0, 0.000001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "8-3-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [24, 12]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [12, 6, 3]
-model_hyperpara['task_specific'] = [12, 6, 3]
-model_hyperpara['regularization_scale'] = [0.0, 0.000001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "8-4-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [24, 12]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [12, 6, 3]
-model_hyperpara['task_specific'] = [24, 12, 6]
-model_hyperpara['regularization_scale'] = [0.0, 0.000001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "8-5-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-
-
-###########################################################################################
-###########################################################################################
-###########################################################################################
-###########################################################################################
-
-
-
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_linear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [48, 24]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [24, 12, 6]
-model_hyperpara['regularization_scale'] = [0.0, 0.001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "9-1-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [48, 24]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [24, 12, 6]
-model_hyperpara['regularization_scale'] = [0.0, 0.001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "9-2-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [48, 24]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [24, 12, 6]
-model_hyperpara['task_specific'] = [12, 6, 3]
-model_hyperpara['regularization_scale'] = [0.0, 0.001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "9-3-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [48, 24]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [24, 12, 6]
-model_hyperpara['task_specific'] = [24, 12, 6]
-model_hyperpara['regularization_scale'] = [0.0, 0.001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "9-4-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [48, 24]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [24, 12, 6]
-model_hyperpara['task_specific'] = [48, 24, 12]
-model_hyperpara['regularization_scale'] = [0.0, 0.001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "9-5-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-
-
-
-
-
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_linear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [48, 24]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [24, 12, 6]
-model_hyperpara['regularization_scale'] = [0.0, 0.0001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "10-1-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [48, 24]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [24, 12, 6]
-model_hyperpara['regularization_scale'] = [0.0, 0.0001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "10-2-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [48, 24]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [24, 12, 6]
-model_hyperpara['task_specific'] = [12, 6, 3]
-model_hyperpara['regularization_scale'] = [0.0, 0.0001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "10-3-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [48, 24]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [24, 12, 6]
-model_hyperpara['task_specific'] = [24, 12, 6]
-model_hyperpara['regularization_scale'] = [0.0, 0.0001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "10-4-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [48, 24]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [24, 12, 6]
-model_hyperpara['task_specific'] = [48, 24, 12]
-model_hyperpara['regularization_scale'] = [0.0, 0.0001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "10-5-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-
-
-
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_linear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [48, 24]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [24, 12, 6]
-model_hyperpara['regularization_scale'] = [0.0, 0.00001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "11-1-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [48, 24]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [24, 12, 6]
-model_hyperpara['regularization_scale'] = [0.0, 0.00001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "11-2-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [48, 24]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [24, 12, 6]
-model_hyperpara['task_specific'] = [12, 6, 3]
-model_hyperpara['regularization_scale'] = [0.0, 0.00001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "11-3-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [48, 24]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [24, 12, 6]
-model_hyperpara['task_specific'] = [24, 12, 6]
-model_hyperpara['regularization_scale'] = [0.0, 0.00001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "11-4-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [48, 24]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [24, 12, 6]
-model_hyperpara['task_specific'] = [48, 24, 12]
-model_hyperpara['regularization_scale'] = [0.0, 0.00001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "11-5-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_linear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [48, 24]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [24, 12, 6]
-model_hyperpara['regularization_scale'] = [0.0, 0.000001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "12-1-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [48, 24]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [24, 12, 6]
-model_hyperpara['regularization_scale'] = [0.0, 0.000001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "12-2-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [48, 24]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [24, 12, 6]
-model_hyperpara['task_specific'] = [12, 6, 3]
-model_hyperpara['regularization_scale'] = [0.0, 0.000001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "12-3-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [48, 24]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [24, 12, 6]
-model_hyperpara['task_specific'] = [24, 12, 6]
-model_hyperpara['regularization_scale'] = [0.0, 0.000001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "12-4-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-
-
-#### Training one model
-model_architecture = 'ELLA_ffnn_nonlinear_relation2'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [48, 24]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['knowledge_base'] = [24, 12, 6]
-model_hyperpara['task_specific'] = [48, 24, 12]
-model_hyperpara['regularization_scale'] = [0.0, 0.000001]
-
-#best_one = 0.0
-train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = [], [], [], []
-for cnt in range(num_run):
-    train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp = train_main(data_type=data_type, data_file_name=data_file_name, data_hyperpara=data_hyperpara, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_hyperpara=train_hyperpara, save_result=save_result, useGPU=use_gpu, GPU_device=gpu_device_num)
-    reset_default_graph()
-
-    train_time.append(train_time_tmp)
-    best_epoch.append(best_epoch_tmp)
-    best_valid_accuracy.append(best_valid_accuracy_tmp)
-    test_accuracy_at_best_epoch.append(test_accuracy_at_best_epoch_tmp)
-    #if best_one < test_accuracy_at_best_epoch_tmp:
-    #    train_time, best_epoch, best_valid_accuracy, test_accuracy_at_best_epoch = train_time_tmp, best_epoch_tmp, best_valid_accuracy_tmp, test_accuracy_at_best_epoch_tmp
-    #    best_one = test_accuracy_at_best_epoch_tmp
-    print "12-5-%d\n\n" % (cnt)
-
-print_to_txt(txt_file_name=result_txt_name, model_architecture=model_architecture, model_hyperpara=model_hyperpara, train_time=train_time, best_epoch=best_epoch, best_valid_error=best_valid_accuracy, best_test_error=test_accuracy_at_best_epoch)
-'''
+model_hyperpara['kernel_sizes'] = [5, 5, 4, 4]
+model_hyperpara['stride_sizes'] = [1, 1, 1, 1]
+model_hyperpara['channel_sizes'] = [32, 64]
+model_hyperpara['padding_type'] = 'VALID'
+model_hyperpara['max_pooling'] = True
+model_hyperpara['pooling_size'] = [2, 2, 2, 2]
+model_hyperpara['dropout'] = True
+model_hyperpara['image_dimension'] = [28, 28, 1]
+
+saved_result = train_run_for_each_model(model_architecture, model_hyperpara, train_hyperpara, [train_data, validation_data, test_data], data_type, data_hyperpara['num_train_group'], mat_file_name, classification_prob, saved_result=saved_result, useGPU=use_gpu, GPU_device=gpu_device_num)
