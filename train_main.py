@@ -8,12 +8,13 @@ import numpy as np
 import tensorflow as tf
 from scipy.io import savemat, loadmat
 
-from gen_data import sine_data, sine_plus_linear_data, mnist_data, mnist_data_print_info
+from gen_data import sine_data_print_info, mnist_data_print_info
+
 from ffnn_baseline_model import FFNN_batch, FFNN_minibatch, MTL_FFNN_minibatch, MTL_FFNN_HPS_minibatch, MTL_FFNN_tensorfactor_minibatch
 from ffnn_ella_model import ELLA_FFNN_simple_minibatch, ELLA_FFNN_linear_relation_minibatch, ELLA_FFNN_linear_relation_minibatch2, ELLA_FFNN_nonlinear_relation_minibatch, ELLA_FFNN_nonlinear_relation_minibatch2
 from cnn_baseline_model import CNN_batch, CNN_minibatch, MTL_CNN_minibatch
 
-
+#### function to generate appropriate deep neural network
 def model_generation(model_architecture, model_hyperpara, train_hyperpara, data_info, classification_prob=False, data_list=None):
     learning_model, gen_model_success = None, True
     learning_rate = train_hyperpara['lr']
@@ -133,7 +134,8 @@ def model_generation(model_architecture, model_hyperpara, train_hyperpara, data_
     return (learning_model, gen_model_success)
 
 
-def train_main(model_architecture, model_hyperpara, train_hyperpara, save_result, data_type, data_file_name, data_hyperpara, result_folder_name=None, useGPU=False, GPU_device=0):
+#### module of training/testing one model
+def train_main(model_architecture, model_hyperpara, train_hyperpara, dataset, data_type, classification_prob, useGPU=False, GPU_device=0, save_result=False):
     ### control log of TensorFlow
     os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
     tf.logging.set_verbosity(tf.logging.ERROR)
@@ -149,44 +151,14 @@ def train_main(model_architecture, model_hyperpara, train_hyperpara, save_result
     config.gpu_options.allow_growth = True
     config.gpu_options.per_process_gpu_memory_fraction = 0.7
 
-
-    ### Generate/Load Data
-    num_train_max, num_valid_max, num_test_max = data_hyperpara['num_train_data'], data_hyperpara['num_valid_data'], data_hyperpara['num_test_data']
+    ### set-up data
+    train_data, validation_data, test_data = dataset
     if data_type is 'sine':
-        num_task, param_for_data_gen = data_hyperpara['num_task'], data_hyperpara['param_for_data_generation']
-        train_data, validation_data, test_data = sine_data(data_file_name, num_task, num_train_max, num_valid_max, num_test_max, param_for_data_gen)
-        num_task, num_train, num_valid, num_test, x_dim, y_dim = sine_data_print_info(train_data, validation_data, test_data)
+        num_task, num_train, num_valid, num_test, x_dim, y_dim = sine_data_print_info(train_data, validation_data, test_data, print_info=False)
     elif data_type is 'sine_plus_linear':
-        num_task, param_for_data_gen = data_hyperpara['num_task'], data_hyperpara['param_for_data_generation']
-        train_data, validation_data, test_data = sine_plus_linear_data(data_file_name, num_task, num_train_max, num_valid_max, num_test_max, param_for_data_gen)
-        num_task, num_train, num_valid, num_test, x_dim, y_dim = sine_data_print_info(train_data, validation_data, test_data)
+        num_task, num_train, num_valid, num_test, x_dim, y_dim = sine_data_print_info(train_data, validation_data, test_data, print_info=False)
     elif data_type is 'mnist':
-        train_data, validation_data, test_data = mnist_data(data_file_name, num_train_max, num_valid_max, num_test_max, num_train_group=15)
-        num_task, num_group, num_train, num_valid, num_test, x_dim, y_dim = mnist_data_print_info(train_data, validation_data, test_data)
-
-
-
-    ###########################################################################
-    #######################  DELETE THIS  #####################################
-    '''
-    ## for test single-task
-    train_x, train_y = train_data[0][0][0], train_data[0][0][1]
-    valid_x, valid_y = validation_data[0][0][0], validation_data[0][0][1]
-    test_x, test_y = test_data[0][0], test_data[0][1]
-    data_for_model = [train_x, train_y, valid_x, valid_y, test_x, test_y]
-    num_train, num_valid, num_test = num_train[0], num_valid[0], num_test[0]
-    num_task=1
-    '''
-
-    ## for test multi-task
-    train_data, validation_data = train_data[0], validation_data[0]
-    data_for_model = [train_data, validation_data, test_data]
-    #######################  DELETE THIS  #####################################
-    ###########################################################################
-
-
-
-
+        num_task, num_train, num_valid, num_test, x_dim, y_dim = mnist_data_print_info(train_data, validation_data, test_data, True, print_info=False)
 
     ### Set hyperparameter related to training process
     learning_step_max = train_hyperpara['learning_step_max']
@@ -196,13 +168,10 @@ def train_main(model_architecture, model_hyperpara, train_hyperpara, save_result
     if 'batch_size' in model_hyperpara:
         batch_size = model_hyperpara['batch_size']
 
-
     ### Generate Model
-    classification_prob = (data_type is 'mnist')
-    learning_model, generation_success = model_generation(model_architecture, model_hyperpara, train_hyperpara, [x_dim, y_dim, num_task], classification_prob=classification_prob, data_list=data_for_model)
+    learning_model, generation_success = model_generation(model_architecture, model_hyperpara, train_hyperpara, [x_dim, y_dim, num_task], classification_prob=classification_prob, data_list=dataset)
     if not generation_success:
         return (None, None, None, None)
-
 
     ### Training Procedure
     if save_result:
@@ -399,38 +368,6 @@ def train_main(model_architecture, model_hyperpara, train_hyperpara, save_result
 
             #### save intermediate result of training procedure
             if (learning_step % 50 == 0) and save_result:
-                intermediate_time = timeit.default_timer()
-                result_summary = {}
-                result_summary['history_train_error'] = train_error_hist
-                result_summary['history_validation_error'] = valid_error_hist
-                result_summary['history_test_error'] = test_error_hist
-                result_summary['history_best_test_error'] = best_test_error_hist
-                result_summary['best_validation_error'] = abs(best_valid_error)
-                result_summary['test_error_at_best_epoch'] = abs(test_error_at_best_epoch)
-                result_summary['best_epoch'] = best_epoch
-                result_summary['epoch'] = learning_step
-                result_summary['learning_rate'] = learning_rate
-                result_summary['model_architecture'] = model_architecture
-                result_summary['improvement_threshold'] = improvement_threshold
-                result_summary['data_type'] = data_type
-                #result_summary['data_para'] = data_para
-                result_summary['data_file_name'] = data_file_name
-                result_summary['number_of_task'] = num_task
-                #if type(num_data_per_task) is np.ndarray:
-                #    result_summary['number_of_data_per_task'] = list(num_data_per_task)
-                #else:
-                #    result_summary['number_of_data_per_task'] = num_data_per_task
-                result_summary['number_of_data_per_task'] = [num_train, num_valid, num_test]
-                try:
-                    result_summary['mini_batch_size'] = batch_size
-                except:
-                    learning_step = learning_step ## useless operation for syntax
-                result_summary['input_dimension'] = x_dim
-                result_summary['output_dimension'] = y_dim
-                result_summary['training_time'] = intermediate_time - start_time
-
-                savemat(result_file_name, result_summary)
-
                 para_file_name = './' + result_folder_name + '/model_parameter(epoch_' + str(learning_step) + ').pkl'
                 with open(para_file_name, 'wb') as para_fobj:
                     pickle.dump([curr_param, best_param], para_fobj)
@@ -443,37 +380,15 @@ def train_main(model_architecture, model_hyperpara, train_hyperpara, save_result
     print "Best validation error : %.4f (at epoch %d)" %(abs(best_valid_error), best_epoch)
     print "Test error at that epoch (%d) : %.4f" %(best_epoch, abs(test_error_at_best_epoch))
 
-    #### save final result of training procedure
-    if save_result:
-        result_summary = {}
-        result_summary['history_train_error'] = train_error_hist
-        result_summary['history_validation_error'] = valid_error_hist
-        result_summary['history_test_error'] = test_error_hist
-        result_summary['history_best_test_error'] = best_test_error_hist
-        result_summary['best_validation_error'] = abs(best_valid_error)
-        result_summary['test_error_at_best_epoch'] = abs(test_error_at_best_epoch)
-        result_summary['best_epoch'] = best_epoch
-        result_summary['epoch'] = learning_step
-        result_summary['learning_rate'] = learning_rate
-        result_summary['model_architecture'] = model_architecture
-        result_summary['improvement_threshold'] = improvement_threshold
-        result_summary['data_type'] = data_type
-        #result_summary['data_para'] = data_para
-        result_summary['data_file_name'] = data_file_name
-        result_summary['number_of_task'] = num_task
-        #if type(num_data_per_task) is np.ndarray:
-        #    result_summary['number_of_data_per_task'] = list(num_data_per_task)
-        #else:
-        #    result_summary['number_of_data_per_task'] = num_data_per_task
-        result_summary['number_of_data_per_task'] = [num_train, num_valid, num_test]
-        try:
-            result_summary['mini_batch_size'] = batch_size
-        except:
-            learning_step = learning_step ## useless operation for syntax
-        result_summary['input_dimension'] = x_dim
-        result_summary['output_dimension'] = y_dim
-        result_summary['training_time'] = end_time - start_time
+    result_summary = {}
+    result_summary['training_time'] = end_time - start_time
+    result_summary['num_epoch'] = learning_step
+    result_summary['best_epoch'] = best_epoch
+    result_summary['history_train_error'] = train_error_hist
+    result_summary['history_validation_error'] = valid_error_hist
+    result_summary['history_test_error'] = test_error_hist
+    result_summary['history_best_test_error'] = best_test_error_hist
+    result_summary['best_validation_error'] = abs(best_valid_error)
+    result_summary['test_error_at_best_epoch'] = abs(test_error_at_best_epoch)
 
-        savemat(result_file_name, result_summary)
-
-    return (end_time-start_time, best_epoch, abs(best_valid_error), abs(test_error_at_best_epoch))
+    return result_summary

@@ -12,14 +12,15 @@ from tensorflow.examples.tutorials.mnist import input_data
 ########## Return Format End ##########
 
 #### function to print information of data file (number of parameters, dimension, etc.)
-def sine_data_print_info(train_data, valid_data, test_data):
+def sine_data_print_info(train_data, valid_data, test_data, print_info=True):
     assert (len(train_data)==len(valid_data) and len(train_data)==len(test_data)), "Different number of tasks in train/validation/test data"
     num_task = len(train_data)
     
     num_train, num_valid, num_test = [train_data[x][0].shape[0] for x in range(num_task)], [validation_data[x][0].shape[0] for x in range(num_task)], [test_data[x][0].shape[0] for x in range(num_task)]
     x_dim, y_dim = train_data[0][0].shape[1], train_data[0][1].shape[1]
-    print "Tasks : ", num_task, "\nTrain data : ", num_train, ", Validation data : ", num_valid, ", Test data : ", num_test
-    print "Input dim : ", x_dim, ", Output dim : ", y_dim, "\n"
+    if print_info:
+        print "Tasks : ", num_task, "\nTrain data : ", num_train, ", Validation data : ", num_valid, ", Test data : ", num_test
+        print "Input dim : ", x_dim, ", Output dim : ", y_dim, "\n"
     return (num_task, num_train, num_valid, num_test, x_dim, y_dim)
 
 
@@ -66,6 +67,7 @@ def sine_data(data_file_name, num_task, num_train_max, num_valid_max, num_test_m
             pickle.dump([train_data, validation_data, test_data, theta_for_tasks], fobj)
             print 'Successfully generate/save data'
 
+    sine_data_print_info(train_data, validation_data, test_data)
     if return_theta:
         return (train_data, validation_data, test_data, theta_for_tasks)
     else:
@@ -115,6 +117,7 @@ def sine_plus_linear_data(data_file_name, num_task, num_train_max, num_valid_max
             pickle.dump([train_data, validation_data, test_data, theta_for_tasks], fobj)
             print 'Successfully generate/save data'
 
+    sine_data_print_info(train_data, validation_data, test_data)
     if return_theta:
         return (train_data, validation_data, test_data, theta_for_tasks)
     else:
@@ -177,22 +180,33 @@ def mnist_data_gen_binary_classification(img_for_true, img_for_false, dataset_si
     return (data_x, data_y)
 
 #### function to print information of data file (number of parameters, dimension, etc.)
-def mnist_data_print_info(train_data, valid_data, test_data):
-    assert (len(train_data) == len(valid_data)), "Different number of groups in train/validation data"
-    num_group = len(train_data)
+def mnist_data_print_info(train_data, valid_data, test_data, no_group=False, print_info=True):
+    if no_group:
+        num_task = len(train_data)
 
-    bool_num_task = [(len(train_data[0]) == len(train_data[x])) for x in range(1, num_group)]
-    assert all(bool_num_task), "Different number of tasks in some of groups in train data"
-    bool_num_task = [(len(valid_data[0]) == len(valid_data[x])) for x in range(1, num_group)]
-    assert all(bool_num_task), "Different number of tasks in some of groups in validation data"
-    assert (len(train_data[0])==len(valid_data[0]) and len(train_data[0])==len(test_data)), "Different number of tasks in train/validation/test data"
-    num_task = len(train_data[0])
-    
-    num_train, num_valid, num_test = [train_data[0][x][0].shape[0] for x in range(num_task)], [valid_data[0][x][0].shape[0] for x in range(num_task)], [test_data[x][0].shape[0] for x in range(num_task)]
-    x_dim, y_dim = train_data[0][0][0].shape[1], train_data[0][0][1].shape[1]
-    print "Tasks : ", num_task, ", Groups of training/valid : ", num_group, "\nTrain data : ", num_train, ", Validation data : ", num_valid, ", Test data : ", num_test
-    print "Input dim : ", x_dim, ", Output dim : ", y_dim, "\n"
-    return (num_task, num_group, num_train, num_valid, num_test, x_dim, y_dim)
+        num_train, num_valid, num_test = [train_data[x][0].shape[0] for x in range(num_task)], [valid_data[x][0].shape[0] for x in range(num_task)], [test_data[x][0].shape[0] for x in range(num_task)]
+        x_dim, y_dim = train_data[0][0].shape[1], train_data[0][1].shape[1]
+        if print_info:
+            print "Tasks : ", num_task, "\nTrain data : ", num_train, ", Validation data : ", num_valid, ", Test data : ", num_test
+            print "Input dim : ", x_dim, ", Output dim : ", y_dim, "\n"
+        return (num_task, num_train, num_valid, num_test, x_dim, y_dim)
+    else:
+        assert (len(train_data) == len(valid_data)), "Different number of groups in train/validation data"
+        num_group = len(train_data)
+
+        bool_num_task = [(len(train_data[0]) == len(train_data[x])) for x in range(1, num_group)]
+        assert all(bool_num_task), "Different number of tasks in some of groups in train data"
+        bool_num_task = [(len(valid_data[0]) == len(valid_data[x])) for x in range(1, num_group)]
+        assert all(bool_num_task), "Different number of tasks in some of groups in validation data"
+        assert (len(train_data[0])==len(valid_data[0]) and len(train_data[0])==len(test_data)), "Different number of tasks in train/validation/test data"
+        num_task = len(train_data[0])
+
+        num_train, num_valid, num_test = [train_data[0][x][0].shape[0] for x in range(num_task)], [valid_data[0][x][0].shape[0] for x in range(num_task)], [test_data[x][0].shape[0] for x in range(num_task)]
+        x_dim, y_dim = train_data[0][0][0].shape[1], train_data[0][0][1].shape[1]
+        if print_info:
+            print "Tasks : ", num_task, ", Groups of training/valid : ", num_group, "\nTrain data : ", num_train, ", Validation data : ", num_valid, ", Test data : ", num_test
+            print "Input dim : ", x_dim, ", Output dim : ", y_dim, "\n"
+        return (num_task, num_group, num_train, num_valid, num_test, x_dim, y_dim)
 
 
 #### generate/handle data of mnist
@@ -245,4 +259,5 @@ def mnist_data(data_file_name, num_train_max, num_valid_max, num_test_max, num_t
             pickle.dump([train_data, validation_data, test_data], fobj)
             print 'Successfully generate/save data'
 
+    mnist_data_print_info(train_data, validation_data, test_data)
     return (train_data, validation_data, test_data)
