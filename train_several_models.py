@@ -12,6 +12,8 @@ from train_main import train_main
 
 def mean_of_list(list_input):
     return float(sum(list_input))/len(list_input)
+
+
 def stddev_of_list(list_input):
     list_mean = mean_of_list(list_input)
     sq_err = [(x-list_mean)**2 for x in list_input]
@@ -20,7 +22,7 @@ def stddev_of_list(list_input):
     else:
         return sqrt(sum(sq_err)/float(len(list_input)-1))
 
-
+    
 def reformat_result_for_mat(model_architecture, model_hyperpara, train_hyperpara, result_from_train_run, data_group_list):
     result_of_curr_run, tmp_dict = {}, {}
     #### 'model_specific_info' element
