@@ -172,12 +172,15 @@ data_file_name = 'mnist_new_data_testing.pkl'
 num_train_max, num_valid_max, num_test_max = data_hyperpara['num_train_data'], data_hyperpara['num_valid_data'], data_hyperpara['num_test_data']
 if data_type is 'sine':
     train_data, validation_data, test_data = sine_data(data_file_name, data_hyperpara['num_task'], data_hyperpara['num_train_data'], data_hyperpara['num_valid_data'], data_hyperpara['num_test_data'], data_hyperpara['param_for_data_generation'])
+    sine_data_print_info(train_data, validation_data, test_data)
     classification_prob=False
 elif data_type is 'sine_plus_linear':
     train_data, validation_data, test_data = sine_plus_linear_data(data_file_name, data_hyperpara['num_task'], data_hyperpara['num_train_data'], data_hyperpara['num_valid_data'], data_hyperpara['num_test_data'], data_hyperpara['param_for_data_generation'])
+    sine_data_print_info(train_data, validation_data, test_data)
     classification_prob=False
 elif data_type is 'mnist':
     train_data, validation_data, test_data = mnist_data(data_file_name, data_hyperpara['num_train_data'], data_hyperpara['num_valid_data'], data_hyperpara['num_test_data'], data_hyperpara['num_train_group'])
+    mnist_data_print_info(train_data, validation_data, test_data)
     classification_prob=True
 
 
@@ -186,7 +189,7 @@ elif data_type is 'mnist':
 
 
 train_hyperpara = {}
-train_hyperpara['num_run_per_model'] = 5
+train_hyperpara['num_run_per_model'] = 13
 train_hyperpara['lr'] = 0.01
 train_hyperpara['lr_decay'] = 100.0
 train_hyperpara['learning_step_max'] = 7500
