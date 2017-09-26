@@ -154,11 +154,11 @@ def train_main(model_architecture, model_hyperpara, train_hyperpara, dataset, da
     ### set-up data
     train_data, validation_data, test_data = dataset
     if data_type is 'sine':
-        num_task, num_train, num_valid, num_test, x_dim, y_dim = sine_data_print_info(train_data, validation_data, test_data)
+        num_task, num_train, num_valid, num_test, x_dim, y_dim = sine_data_print_info(train_data, validation_data, test_data, print_info=False)
     elif data_type is 'sine_plus_linear':
-        num_task, num_train, num_valid, num_test, x_dim, y_dim = sine_data_print_info(train_data, validation_data, test_data)
+        num_task, num_train, num_valid, num_test, x_dim, y_dim = sine_data_print_info(train_data, validation_data, test_data, print_info=False)
     elif data_type is 'mnist':
-        num_task, num_train, num_valid, num_test, x_dim, y_dim = mnist_data_print_info(train_data, validation_data, test_data, True)
+        num_task, num_train, num_valid, num_test, x_dim, y_dim = mnist_data_print_info(train_data, validation_data, test_data, True, print_info=False)
 
     ### Set hyperparameter related to training process
     learning_step_max = train_hyperpara['learning_step_max']
