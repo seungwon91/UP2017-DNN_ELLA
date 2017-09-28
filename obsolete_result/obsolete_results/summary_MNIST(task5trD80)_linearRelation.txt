@@ -1,0 +1,120 @@
+Model : ELLA_ffnn_linear_relation
+Hidden : [24]	KB : [16, 8]	Reg Scale : [0.0, 0.001]
+Time consumption for training : 88.71
+Best validation/test error : 0.9150/ 0.8748 (at epoch 113)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [24]	KB : [16, 8]	Reg Scale : [0.0, 0.0001]
+Time consumption for training : 99.36
+Best validation/test error : 0.8750/ 0.8642 (at epoch 126)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [24]	KB : [16, 8]	Reg Scale : [0.0, 1e-05]
+Time consumption for training : 52.43
+Best validation/test error : 0.9100/ 0.8780 (at epoch 51)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [24]	KB : [16, 8]	Reg Scale : [0.0, 1e-06]
+Time consumption for training : 144.49
+Best validation/test error : 0.8850/ 0.8737 (at epoch 161)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [48]	KB : [16, 8]	Reg Scale : [0.0, 0.001]
+Time consumption for training : 173.31
+Best validation/test error : 0.9700/ 0.9679 (at epoch 140)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [48]	KB : [16, 8]	Reg Scale : [0.0, 0.0001]
+Time consumption for training : 155.30
+Best validation/test error : 0.9700/ 0.9633 (at epoch 124)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [48]	KB : [16, 8]	Reg Scale : [0.0, 1e-05]
+Time consumption for training : 186.51
+Best validation/test error : 0.9050/ 0.8758 (at epoch 150)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [48]	KB : [16, 8]	Reg Scale : [0.0, 1e-06]
+Time consumption for training : 142.53
+Best validation/test error : 0.9800/ 0.9548 (at epoch 115)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [24]	KB : [32, 16]	Reg Scale : [0.0, 0.001]
+Time consumption for training : 123.47
+Best validation/test error : 0.7550/ 0.7579 (at epoch 116)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [24]	KB : [32, 16]	Reg Scale : [0.0, 0.0001]
+Time consumption for training : 231.37
+Best validation/test error : 0.9750/ 0.9514 (at epoch 198)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [24]	KB : [32, 16]	Reg Scale : [0.0, 1e-05]
+Time consumption for training : 150.89
+Best validation/test error : 0.9000/ 0.8672 (at epoch 133)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [24]	KB : [32, 16]	Reg Scale : [0.0, 1e-06]
+Time consumption for training : 85.70
+Best validation/test error : 0.9050/ 0.8540 (at epoch 65)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [48]	KB : [32, 16]	Reg Scale : [0.0, 0.001]
+Time consumption for training : 198.94
+Best validation/test error : 0.9750/ 0.9612 (at epoch 99)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [48]	KB : [32, 16]	Reg Scale : [0.0, 0.0001]
+Time consumption for training : 1101.90
+Best validation/test error : 0.8950/ 0.8823 (at epoch 542)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [48]	KB : [32, 16]	Reg Scale : [0.0, 1e-05]
+Time consumption for training : 120.93
+Best validation/test error : 0.9750/ 0.9698 (at epoch 72)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [48]	KB : [32, 16]	Reg Scale : [0.0, 1e-06]
+Time consumption for training : 202.13
+Best validation/test error : 0.9250/ 0.8843 (at epoch 115)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [16, 16]	KB : [8, 8, 8]	Reg Scale : [0.0, 0.001]
+Time consumption for training : 120.30
+Best validation/test error : 0.9750/ 0.9680 (at epoch 169)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [16, 16]	KB : [8, 8, 8]	Reg Scale : [0.0, 0.0001]
+Time consumption for training : 50.35
+Best validation/test error : 0.9900/ 0.9717 (at epoch 70)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [16, 16]	KB : [8, 8, 8]	Reg Scale : [0.0, 1e-05]
+Time consumption for training : 156.24
+Best validation/test error : 0.9800/ 0.9726 (at epoch 221)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [16, 16]	KB : [8, 8, 8]	Reg Scale : [0.0, 1e-06]
+Time consumption for training : 88.64
+Best validation/test error : 0.9850/ 0.9758 (at epoch 124)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [32, 16]	KB : [16, 8, 8]	Reg Scale : [0.0, 0.001]
+Time consumption for training : 75.78
+Best validation/test error : 0.9900/ 0.9752 (at epoch 72)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [32, 16]	KB : [16, 8, 8]	Reg Scale : [0.0, 0.0001]
+Time consumption for training : 70.31
+Best validation/test error : 0.9250/ 0.8831 (at epoch 66)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [32, 16]	KB : [16, 8, 8]	Reg Scale : [0.0, 1e-05]
+Time consumption for training : 70.25
+Best validation/test error : 0.9850/ 0.9687 (at epoch 65)
+
+Model : ELLA_ffnn_linear_relation
+Hidden : [32, 16]	KB : [16, 8, 8]	Reg Scale : [0.0, 1e-06]
+Time consumption for training : 243.03
+Best validation/test error : 0.9800/ 0.9653 (at epoch 234)
+

@@ -1,0 +1,281 @@
+{Data : 6 tasks & 200 data per each}
+
+[Single NN for MTL]
+hidden 16, lr 0.001
+Best validation error : 0.5722 (at epoch 1065)
+Test error at that epoch (1065) : 0.5789
+
+hidden 32, lr 0.001
+Best validation error : 0.5856 (at epoch 1663)
+Test error at that epoch (1663) : 0.5914
+
+
+[ELLA FFNN ver. simple]
+hidden 32, lr 0.001, KB [12, 12, 5, 5], regularization scale [0.001, 0.0001]
+Best validation error : 0.6332 (at epoch 253)
+Test error at that epoch (253) : 0.6480
+
+hidden 32, lr 0.01, KB [12, 12, 5, 5], regularization scale [0.001, 0.0001]
+Best validation error : 0.6381 (at epoch 259)
+Test error at that epoch (259) : 0.6563
+
+hidden 32, lr 0.001, KB [12, 12, 8, 8], regularization scale [0.001, 0.0001]
+Best validation error : 0.647062 (at epoch 145)
+Test error at that epoch (145) : 0.643054
+
+hidden 16, lr 0.001, KB [12, 12, 5, 5], regularization scale [0.001, 0.0001]
+Best validation error : 0.6199 (at epoch 294)
+Test error at that epoch (294) : 0.61876
+
+hidden 16, lr 0.001, KB [8, 8, 4, 4], regularization scale [0.001, 0.0001]
+Best validation error : 0.6162 (at epoch 841)
+Test error at that epoch (841) : 0.6238
+
+hidden 16, lr 0.001, KB [8, 8, 4, 4], regularization scale [0.0001, 0.00001]
+Best validation error : 0.6253 (at epoch 279)
+Test error at that epoch (279) : 0.6166
+
+hidden 16, lr 0.001, KB [8, 8, 4, 4], regularization scale [0.00001, 0.000001]
+Best validation error : 0.6420 (at epoch 973)
+Test error at that epoch (973) : 0.6249
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{Data : 20 tasks & 100 data per each}
+[Single NN for MTL]
+hidden 32, lr 0.005
+Best validation error : 0.6605 (at epoch 730)
+Test error at that epoch (730) : 0.6469
+
+hidden 16, lr 0.005
+Best validation error : 0.5986 (at epoch 822)
+Test error at that epoch (822) : 0.6124
+
+hidden 8, lr 0.005
+Best validation error : 0.5886 (at epoch 1342)
+Test error at that epoch (1342) : 0.5889
+
+hidden 4, lr 0.005
+Best validation error : 0.5749 (at epoch 695)
+Test error at that epoch (695) : 0.5775
+
+hidden 2, lr 0.005
+Best validation error : 0.5733 (at epoch 928)
+Test error at that epoch (928) : 0.5761
+
+hidden 1, lr 0.005
+Best validation error : 4.5621 (at epoch 117)
+Test error at that epoch (117) : 4.4455
+
+
+[HPS NN for MTL]
+shared hidden 32, lr 0.01, task specific [8 for _ in range(num_task)]+[y_dim for _ in range(num_task)]
+Best validation error : 0.7582 (at epoch 681)
+Test error at that epoch (681) : 0.7640
+
+shared hidden 16, lr 0.01, task specific [8 for _ in range(num_task)]+[y_dim for _ in range(num_task)]
+Best validation error : 0.6835 (at epoch 931)
+Test error at that epoch (931) : 0.6853
+
+shared hidden 8, lr 0.01, task specific [8 for _ in range(num_task)]+[y_dim for _ in range(num_task)]
+Best validation error : 0.6216 (at epoch 2137)
+Test error at that epoch (2137) : 0.6399
+
+shared hidden 8, lr 0.01, task specific [4 for _ in range(num_task)]+[y_dim for _ in range(num_task)]
+Best validation error : 2.4646 (at epoch 1350)
+Test error at that epoch (1350) : 2.8408
+
+
+
+
+
+
+[ELLA FFNN ver. simple]
+hidden 32, lr 0.005, KB [16, 16, 8, 8], regularization scale [0.0001, 0.0001]
+Best validation error : 0.9400 (at epoch 535)
+Test error at that epoch (535) : 0.9632
+
+hidden 32, lr 0.005, KB [16, 16, 8, 8], regularization scale [0.0001, 0.00001]
+Best validation error : 0.9347 (at epoch 335)
+Test error at that epoch (335) : 0.9735
+
+hidden 32, lr 0.005, KB [16, 16, 8, 8], regularization scale [0.00001, 0.00001]
+Best validation error : 0.9364 (at epoch 305)
+Test error at that epoch (305) : 0.9248
+
+hidden 32, lr 0.005, KB [16, 16, 8, 8], regularization scale [0.00001, 0.000001]
+Best validation error : 0.9581 (at epoch 615)
+Test error at that epoch (615) : 0.9659
+
+
+
+hidden 32, lr 0.005, KB [12, 12, 6, 6], regularization scale [0.0001, 0.0001]
+Best validation error : 1.0292 (at epoch 1189)
+Test error at that epoch (1189) : 1.0583
+
+hidden 32, lr 0.005, KB [12, 12, 6, 6], regularization scale [0.0001, 0.00001]
+Best validation error : 0.9961 (at epoch 542)
+Test error at that epoch (542) : 1.0333
+
+hidden 32, lr 0.005, KB [12, 12, 6, 6], regularization scale [0.00001, 0.00001]
+Best validation error : 0.9237 (at epoch 848)
+Test error at that epoch (848) : 0.9826
+
+hidden 32, lr 0.005, KB [12, 12, 6, 6], regularization scale [0.00001, 0.0001]
+Best validation error : 0.9649 (at epoch 561)
+Test error at that epoch (561) : 1.0378
+
+hidden 32, lr 0.005, KB [12, 12, 6, 6], regularization scale [0.00001, 0.000001]
+Best validation error : 0.8960 (at epoch 716)
+Test error at that epoch (716) : 0.9630
+
+hidden 32, lr 0.005, KB [12, 12, 6, 6], regularization scale [0.000001, 0.000001]
+Best validation error : 1.0053 (at epoch 646)
+Test error at that epoch (646) : 0.9872
+
+
+[ELLA FFNN ver. tensor factorization]
+hidden 32, lr 0.01, KB [12, 8, 8, 4], regularization scale [0.0001, 0.0001]
+Best validation error : 0.7090 (at epoch 613)
+Test error at that epoch (613) : 0.7303
+
+hidden 32, lr 0.025, KB [12, 8, 8, 4], regularization scale [0.0001, 0.00001]
+Best validation error : 0.6967 (at epoch 1054)
+Test error at that epoch (1054) : 0.7320
+
+hidden 32, lr 0.01, KB [12, 8, 8, 4], regularization scale [0.0001, 0.00001]
+Best validation error : 0.7287 (at epoch 1110)
+Test error at that epoch (1110) : 0.7166
+
+hidden 24, lr 0.01, KB [12, 8, 8, 4], regularization scale [0.0001, 0.00001]
+Best validation error : 0.6674 (at epoch 1035)
+Test error at that epoch (1035) : 0.6658
+
+hidden 16, lr 0.01, KB [12, 8, 8, 4], regularization scale [0.0001, 0.00001]
+Best validation error : 0.6723 (at epoch 1281)
+Test error at that epoch (1281) : 0.6795
+
+hidden 16, lr 0.01, KB [8, 8, 6, 4], regularization scale [0.0001, 0.00001]
+Best validation error : 0.6260 (at epoch 952)
+Test error at that epoch (952) : 0.6178
+
+hidden 12, lr 0.01, KB [8, 8, 6, 4], regularization scale [0.0001, 0.00001]
+Best validation error : 0.6120 (at epoch 1306)
+Test error at that epoch (1306) : 0.6234
+
+hidden 12, lr 0.01, KB [6, 6, 4, 4], regularization scale [0.0001, 0.00001]
+Best validation error : 0.6161 (at epoch 2037)
+Test error at that epoch (2037) : 0.6078
+
+hidden 12, lr 0.01, KB [6, 4, 6, 4], regularization scale [0.0001, 0.00001]
+Best validation error : 0.6061 (at epoch 794)
+Test error at that epoch (794) : 0.6124
+
+hidden 12, lr 0.01, KB [6, 4, 4, 4], regularization scale [0.0001, 0.00001]
+Best validation error : 0.6130 (at epoch 627)
+Test error at that epoch (627) : 0.6067
+
+hidden 12, lr 0.01, KB [4, 4, 4, 4], regularization scale [0.0001, 0.00001]
+Best validation error : 0.5980 (at epoch 751)
+Test error at that epoch (751) : 0.6130
+
+hidden 8, lr 0.01, KB [4, 4, 2, 2], regularization scale [0.0001, 0.00001]
+Best validation error : 0.5954 (at epoch 1035)
+Test error at that epoch (1035) : 0.6039
+
+hidden 4, lr 0.01, KB [2, 2, 2, 2], regularization scale [0.0001, 0.00001]
+Best validation error : 1.6770 (at epoch 4002)
+Test error at that epoch (4002) : 1.3597
+
+hidden 2, lr 0.01, KB [2, 2, 2, 2], regularization scale [0.0001, 0.00001]
+Best validation error : 5.3845 (at epoch 2688)
+Test error at that epoch (2688) : 5.0740
+
+hidden 32, lr 0.005, KB [12, 8, 8, 4], regularization scale [0.0001, 0.00001]
+Best validation error : 0.7362 (at epoch 2026)
+Test error at that epoch (2026) : 0.7517
+
+hidden 32, lr 0.01, KB [12, 8, 8, 4], regularization scale [0.00001, 0.00001]
+Best validation error : 0.6688 (at epoch 1176)
+Test error at that epoch (1176) : 0.7216
+
+hidden 32, lr 0.01, KB [12, 8, 8, 4], regularization scale [0.00001, 0.000001]
+Best validation error : 0.7203 (at epoch 429)
+Test error at that epoch (429) : 0.7722
+
+hidden 32, lr 0.01, KB [16, 8, 12, 6], regularization scale [0.0001, 0.00001]
+Best validation error : 0.7361 (at epoch 640)
+Test error at that epoch (640) : 0.7841
+
+hidden [4, 4], lr 0.01, KB [2, 2, 2, 2, 2, 2], regularization scale [0.0001, 0.00001]
+Best validation error : 4.0608 (at epoch 2193)
+Test error at that epoch (2193) : 3.8086
+
+
+
+
+
+hidden [6, 4], lr 0.01, KB [4, 4, 4, 4, 2, 2], regularization scale [0.0001, 0.00001]
+Best validation error : 2.1385 (at epoch 1288)
+Test error at that epoch (1288) : 1.7291
+
+hidden [6, 6], lr 0.01, KB [4, 4, 4, 4, 2, 2], regularization scale [0.0001, 0.00001]
+Best validation error : 0.6019 (at epoch 1900)
+Test error at that epoch (1900) : 0.5905
+
+hidden [8, 4], lr 0.01, KB [4, 4, 4, 4, 2, 2], regularization scale [0.0001, 0.00001]
+Best validation error : 0.6034 (at epoch 2798)
+Test error at that epoch (2798) : 0.6066
+
+hidden [8, 6], lr 0.01, KB [4, 4, 4, 4, 2, 2], regularization scale [0.0001, 0.00001]
+Best validation error : 0.5977 (at epoch 2142)
+Test error at that epoch (2142) : 0.6000
+
+hidden [8, 6], lr 0.01, KB [6, 4, 4, 2, 2, 2], regularization scale [0.0001, 0.00001]
+Best validation error : 0.6181 (at epoch 4291)
+Test error at that epoch (4291) : 0.6143
+
+hidden [8, 8], lr 0.05, KB [4, 4, 4, 4, 2, 2], regularization scale [0.0001, 0.00001]
+Best validation error : 0.6107 (at epoch 1203)
+Test error at that epoch (1203) : 0.6375
+
+hidden [8, 8], lr 0.01, KB [4, 4, 4, 4, 2, 2], regularization scale [0.0001, 0.00001]
+Best validation error : 0.6050 (at epoch 606)
+Test error at that epoch (606) : 0.6176
+
+hidden [8, 8], lr 0.01, KB [6, 3, 4, 2, 2, 2], regularization scale [0.0001, 0.00001]
+Best validation error : 0.6189 (at epoch 1105)
+Test error at that epoch (1105) : 0.6095
+
+hidden [8, 8], lr 0.01, KB [6, 4, 4, 2, 2, 2], regularization scale [0.0001, 0.00001]
+Best validation error : 0.5949 (at epoch 1630)
+Test error at that epoch (1630) : 0.6025
+
+hidden [8, 8], lr 0.01, KB [6, 4, 4, 4, 2, 2], regularization scale [0.0001, 0.00001]
+Best validation error : 0.6058 (at epoch 2581)
+Test error at that epoch (2581) : 0.6052
+
+hidden [8, 8], lr 0.01, KB [6, 4, 6, 4, 2, 2], regularization scale [0.0001, 0.00001]
+Best validation error : 0.6004 (at epoch 1173)
+Test error at that epoch (1173) : 0.6257
+
+hidden [12, 8], lr 0.01, KB [6, 4, 4, 2, 2, 2], regularization scale [0.0001, 0.00001]
+Best validation error : 0.6188 (at epoch 1629)
+Test error at that epoch (1629) : 0.6213
+
+
+
+
+
+hidden , lr , KB [, , , ], regularization scale [, ]
