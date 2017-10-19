@@ -12,15 +12,17 @@ from tensorflow.examples.tutorials.mnist import input_data
 ########## Return Format End ##########
 
 #### function to print information of data file (number of parameters, dimension, etc.)
-def sine_data_print_info(train_data, valid_data, test_data, print_info=True):
-    assert (len(train_data)==len(valid_data) and len(train_data)==len(test_data)), "Different number of tasks in train/validation/test data"
+def sine_data_print_info(train_data, validation_data, test_data, print_info=True):
+    assert (len(train_data)==len(validation_data) and len(train_data)==len(test_data)), "Different number of tasks in train/validation/test data"
     num_task = len(train_data)
     
     num_train, num_valid, num_test = [train_data[x][0].shape[0] for x in range(num_task)], [validation_data[x][0].shape[0] for x in range(num_task)], [test_data[x][0].shape[0] for x in range(num_task)]
     x_dim, y_dim = train_data[0][0].shape[1], train_data[0][1].shape[1]
     if print_info:
-        print "Tasks : ", num_task, "\nTrain data : ", num_train, ", Validation data : ", num_valid, ", Test data : ", num_test
-        print "Input dim : ", x_dim, ", Output dim : ", y_dim, "\n"
+        #print("Tasks : ", num_task, "\nTrain data : ", num_train, ", Validation data : ", num_valid, ", Test data : ", num_test)
+        #print("Input dim : ", x_dim, ", Output dim : ", y_dim, "\n")
+        print("Tasks : %d\nTrain data : %d, Validation data : %d, Test data : %d" %(num_task, num_train, num_valid, num_test))
+        print("Input dim : %d, Output dim : %d\n" %(x_dim, y_dim))
     return (num_task, num_train, num_valid, num_test, x_dim, y_dim)
 
 
@@ -35,7 +37,7 @@ def sine_data(data_file_name, num_task, num_train_max, num_valid_max, num_test_m
     if data_file_name in os.listdir(data_path):
         with open('./Data/' + data_file_name, 'rb') as fobj:
             train_data, validation_data, test_data, theta_for_tasks = pickle.load(fobj)
-            print 'Successfully load data'
+            print('Successfully load data')
     else:
         train_data, validation_data, test_data = [], [], []
         theta_for_tasks = []
@@ -43,7 +45,7 @@ def sine_data(data_file_name, num_task, num_train_max, num_valid_max, num_test_m
         for task_cnt in range(num_task):
             #### train data
             task_theta = (data_param[5]-data_param[4])*np.random.rand(data_param[0])+data_param[4]
-            thate_for_tasks.append(task_theta)
+            theta_for_tasks.append(task_theta)
 
             train_x = (data_param[3]-data_param[2])*np.random.rand(num_train_max, data_param[0])+data_param[2]
             noise = data_param[6]*np.random.randn(num_train_max)
@@ -65,9 +67,9 @@ def sine_data(data_file_name, num_task, num_train_max, num_valid_max, num_test_m
         #### save data
         with open('./Data/' + data_file_name, 'wb') as fobj:
             pickle.dump([train_data, validation_data, test_data, theta_for_tasks], fobj)
-            print 'Successfully generate/save data'
+            print('Successfully generate/save data')
 
-    sine_data_print_info(train_data, validation_data, test_data)
+    #sine_data_print_info(train_data, validation_data, test_data)
     if return_theta:
         return (train_data, validation_data, test_data, theta_for_tasks)
     else:
@@ -85,7 +87,7 @@ def sine_plus_linear_data(data_file_name, num_task, num_train_max, num_valid_max
     if data_file_name in os.listdir(data_path):
         with open('./Data/' + data_file_name, 'rb') as fobj:
             train_data, validation_data, test_data, theta_for_tasks = pickle.load(fobj)
-            print 'Successfully load data'
+            print('Successfully load data')
     else:
         train_data, validation_data, test_data = [], [], []
         theta_for_tasks = []
@@ -93,7 +95,7 @@ def sine_plus_linear_data(data_file_name, num_task, num_train_max, num_valid_max
         for task_cnt in range(num_task):
             #### train data
             task_theta = (data_param[6]-data_param[5])*np.random.rand(data_param[0])+data_param[5]
-            thate_for_tasks.append(task_theta)
+            theta_for_tasks.append(task_theta)
 
             train_x = (data_param[4]-data_param[3])*np.random.rand(num_train_max, data_param[0])+data_param[3]
             noise = data_param[7]*np.random.randn(num_train_max)
@@ -115,9 +117,9 @@ def sine_plus_linear_data(data_file_name, num_task, num_train_max, num_valid_max
         #### save data
         with open('./Data/' + data_file_name, 'wb') as fobj:
             pickle.dump([train_data, validation_data, test_data, theta_for_tasks], fobj)
-            print 'Successfully generate/save data'
+            print('Successfully generate/save data')
 
-    sine_data_print_info(train_data, validation_data, test_data)
+    #sine_data_print_info(train_data, validation_data, test_data)
     if return_theta:
         return (train_data, validation_data, test_data, theta_for_tasks)
     else:
@@ -185,11 +187,12 @@ def mnist_data_print_info(train_data, valid_data, test_data, no_group=False, pri
         num_task = len(train_data)
 
         num_train, num_valid, num_test = [train_data[x][0].shape[0] for x in range(num_task)], [valid_data[x][0].shape[0] for x in range(num_task)], [test_data[x][0].shape[0] for x in range(num_task)]
-        x_dim, y_dim = train_data[0][0].shape[1], train_data[0][1].shape[1]
+        x_dim, y_dim = train_data[0][0].shape[1], 0
+        y_depth = np.amax(train_data[0][1])+1
         if print_info:
-            print "Tasks : ", num_task, "\nTrain data : ", num_train, ", Validation data : ", num_valid, ", Test data : ", num_test
-            print "Input dim : ", x_dim, ", Output dim : ", y_dim, "\n"
-        return (num_task, num_train, num_valid, num_test, x_dim, y_dim)
+            print("Tasks : %d\nTrain data : %d, Validation data : %d, Test data : %d" %(num_task, num_train, num_valid, num_test))
+            print("Input dim : %d, Output dim : %d, Maximum label : %d\n" %(x_dim, y_dim, y_depth))
+        return (num_task, num_train, num_valid, num_test, x_dim, y_dim, y_depth)
     else:
         assert (len(train_data) == len(valid_data)), "Different number of groups in train/validation data"
         num_group = len(train_data)
@@ -202,11 +205,13 @@ def mnist_data_print_info(train_data, valid_data, test_data, no_group=False, pri
         num_task = len(train_data[0])
 
         num_train, num_valid, num_test = [train_data[0][x][0].shape[0] for x in range(num_task)], [valid_data[0][x][0].shape[0] for x in range(num_task)], [test_data[x][0].shape[0] for x in range(num_task)]
-        x_dim, y_dim = train_data[0][0][0].shape[1], train_data[0][0][1].shape[1]
+        x_dim, y_dim = train_data[0][0][0].shape[1], 0
+        y_depth = max([np.amax(train_data[0][x][1]) for x in range(num_task)])+1
         if print_info:
-            print "Tasks : ", num_task, ", Groups of training/valid : ", num_group, "\nTrain data : ", num_train, ", Validation data : ", num_valid, ", Test data : ", num_test
-            print "Input dim : ", x_dim, ", Output dim : ", y_dim, "\n"
-        return (num_task, num_group, num_train, num_valid, num_test, x_dim, y_dim)
+            print("Tasks : %d, Groups of training/valid : %d\n" %(num_task, num_group))
+            print("Train data : ", num_train, ", Validation data : ", num_valid, ", Test data : ", num_test)
+            print("Input dim : %d, Output dim : %d, Maximum label : %d\n" %(x_dim, y_dim, y_depth))
+        return (num_task, num_group, num_train, num_valid, num_test, x_dim, y_dim, y_depth)
 
 
 #### generate/handle data of mnist
@@ -222,7 +227,7 @@ def mnist_data(data_file_name, num_train_max, num_valid_max, num_test_max, num_t
     if data_file_name in os.listdir(data_path):
         with open('./Data/' + data_file_name, 'rb') as fobj:
             train_data, validation_data, test_data = pickle.load(fobj)
-            print 'Successfully load data'
+            print('Successfully load data')
     else:
         mnist = input_data.read_data_sets('MNIST_data', one_hot=False)
         #### subclasses : train, validation, test with images/labels subclasses
@@ -236,7 +241,8 @@ def mnist_data(data_file_name, num_train_max, num_valid_max, num_test_max, num_t
             train_data_tmp = []
             for task_cnt in range(num_tasks):
                 train_x_tmp, train_y_tmp = mnist_data_gen_binary_classification(categorized_train_x[2*task_cnt], categorized_train_x[2*task_cnt+1], num_train_max)
-                train_data_tmp.append( ( np.array(train_x_tmp), np.reshape(np.array(train_y_tmp), (len(train_y_tmp), 1)) ) )
+                #train_data_tmp.append( ( np.array(train_x_tmp), np.reshape(np.array(train_y_tmp), (len(train_y_tmp), 1)) ) )
+                train_data_tmp.append( ( np.array(train_x_tmp), np.array(train_y_tmp) ) )
             train_data.append(train_data_tmp)
 
         ## process validation data
@@ -245,19 +251,21 @@ def mnist_data(data_file_name, num_train_max, num_valid_max, num_test_max, num_t
             validation_data_tmp = []
             for task_cnt in range(num_tasks):
                 valid_x_tmp, valid_y_tmp = mnist_data_gen_binary_classification(categorized_valid_x[2*task_cnt], categorized_valid_x[2*task_cnt+1], num_valid_max)
-                validation_data_tmp.append( ( np.array(valid_x_tmp), np.reshape(np.array(valid_y_tmp), (len(valid_y_tmp), 1)) ) )
+                #validation_data_tmp.append( ( np.array(valid_x_tmp), np.reshape(np.array(valid_y_tmp), (len(valid_y_tmp), 1)) ) )
+                validation_data_tmp.append( ( np.array(valid_x_tmp), np.array(valid_y_tmp) ) )
             validation_data.append(validation_data_tmp)
 
         ## process test data
         test_data = []
         for task_cnt in range(num_tasks):
             test_x_tmp, test_y_tmp = mnist_data_gen_binary_classification(categorized_test_x[2*task_cnt], categorized_test_x[2*task_cnt+1], num_test_max)
-            test_data.append( ( np.array(test_x_tmp), np.reshape(np.array(test_y_tmp), (len(test_y_tmp), 1)) ) )
+            #test_data.append( ( np.array(test_x_tmp), np.reshape(np.array(test_y_tmp), (len(test_y_tmp), 1)) ) )
+            test_data.append( ( np.array(test_x_tmp), np.array(test_y_tmp) ) )
 
         #### save data
         with open('./Data/' + data_file_name, 'wb') as fobj:
             pickle.dump([train_data, validation_data, test_data], fobj)
-            print 'Successfully generate/save data'
+            print('Successfully generate/save data')
 
-    mnist_data_print_info(train_data, validation_data, test_data)
+    #mnist_data_print_info(train_data, validation_data, test_data)
     return (train_data, validation_data, test_data)
