@@ -100,8 +100,8 @@ def train_run_for_each_model(model_architecture, model_hyperpara, train_hyperpar
 #       train_hyperpara : 'lr', 'learning_step_max', 'improvement_threshold', 'patience', 'patience_multiplier'
 
 
-use_gpu, gpu_device_num = True, 0
-mat_file_name = 'delete_this_training_result.mat'
+use_gpu, gpu_device_num = True, 1
+mat_file_name = 'mnist_mtl_ellacnn_linNonlin.mat'
 
 
 ##############################################
@@ -144,9 +144,9 @@ elif data_type is 'mnist':
 ##############################################
 
 train_hyperpara = {}
-train_hyperpara['num_run_per_model'] = 3
-train_hyperpara['lr'] = 0.05
-train_hyperpara['lr_decay'] = 100.0
+train_hyperpara['num_run_per_model'] = 5
+train_hyperpara['lr'] = 0.025
+train_hyperpara['lr_decay'] = 200.0
 train_hyperpara['learning_step_max'] = 4000
 #train_hyperpara['improvement_threshold'] = 0.9985    # for error (minimizing it)
 train_hyperpara['improvement_threshold'] = 1.002      # for accuracy (maximizing it)
@@ -154,129 +154,255 @@ train_hyperpara['patience'] = 200
 train_hyperpara['patience_multiplier'] = 2.5
 
 
-#train_hyperpara['num_run_per_model'] = 1
-#train_hyperpara['learning_step_max'] = 200
-#train_hyperpara['patience'] = 50
+#train_hyperpara['num_run_per_model'] = 2
+#train_hyperpara['learning_step_max'] = 10
+#train_hyperpara['patience'] = 4
 
 
-'''
-model_architecture = 'mtl_ffnn_minibatch'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-'''
 
 
-'''
-model_architecture = 'mtl_cnn_minibatch'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
-model_hyperpara['kernel_sizes'] = [5, 5, 5, 5]
-model_hyperpara['stride_sizes'] = [2, 2, 2, 2]
-model_hyperpara['channel_sizes'] = [32, 64]
-model_hyperpara['padding_type'] = 'SAME'
-model_hyperpara['max_pooling'] = True
-model_hyperpara['pooling_size'] = [2, 2, 2, 2]
-model_hyperpara['dropout'] = True
-model_hyperpara['image_dimension'] = [28, 28, 1]
-'''
 
-
-'''
 #### Training one model
 model_architecture = 'ELLA_cnn_linear_relation2'
 model_hyperpara = {}
 model_hyperpara['hidden_layer'] = [32, 16]
 model_hyperpara['batch_size'] = 20
-model_hyperpara['kernel_sizes'] = [5, 5, 4, 4]
+model_hyperpara['kernel_sizes'] = [5, 5, 5, 5]
 model_hyperpara['stride_sizes'] = [1, 1, 1, 1]
-model_hyperpara['channel_sizes'] = [32, 64]
-model_hyperpara['cnn_KB_sizes'] = [9, 16, 9, 24]
-model_hyperpara['fc_KB_sizes'] = [64, 64, 32, 64, 8, 16]
+model_hyperpara['channel_sizes'] = [64, 32]
+model_hyperpara['cnn_KB_sizes'] = [9, 32, 9, 16]
+model_hyperpara['fc_KB_sizes'] = [64, 64, 32, 48, 8, 16]
 model_hyperpara['padding_type'] = 'SAME'
 model_hyperpara['max_pooling'] = True
 model_hyperpara['pooling_size'] = [2, 2, 2, 2]
 model_hyperpara['dropout'] = True
 model_hyperpara['image_dimension'] = [28, 28, 1]
-model_hyperpara['regularization_scale'] = [0.0, 0.0001]
-## valid 0.54/test 0.52
-'''
+model_hyperpara['regularization_scale'] = [0.0, 1e-7]
+
+saved_result = train_run_for_each_model(model_architecture, model_hyperpara, train_hyperpara, [train_data, validation_data, test_data], data_type, data_hyperpara['num_train_group'], mat_file_name, classification_prob, saved_result=None, useGPU=use_gpu, GPU_device=gpu_device_num)
 
 
-'''
+#### Training one model
+model_architecture = 'ELLA_cnn_linear_relation2'
+model_hyperpara = {}
+model_hyperpara['hidden_layer'] = [64, 32]
+model_hyperpara['batch_size'] = 20
+model_hyperpara['kernel_sizes'] = [5, 5, 5, 5]
+model_hyperpara['stride_sizes'] = [1, 1, 1, 1]
+model_hyperpara['channel_sizes'] = [64, 32]
+model_hyperpara['cnn_KB_sizes'] = [9, 32, 9, 16]
+model_hyperpara['fc_KB_sizes'] = [64, 96, 48, 64, 16, 24]
+model_hyperpara['padding_type'] = 'SAME'
+model_hyperpara['max_pooling'] = True
+model_hyperpara['pooling_size'] = [2, 2, 2, 2]
+model_hyperpara['dropout'] = True
+model_hyperpara['image_dimension'] = [28, 28, 1]
+model_hyperpara['regularization_scale'] = [0.0, 1e-7]
+
+saved_result = train_run_for_each_model(model_architecture, model_hyperpara, train_hyperpara, [train_data, validation_data, test_data], data_type, data_hyperpara['num_train_group'], mat_file_name, classification_prob, saved_result=saved_result, useGPU=use_gpu, GPU_device=gpu_device_num)
+
+
+#### Training one model
+model_architecture = 'ELLA_cnn_linear_relation2'
+model_hyperpara = {}
+model_hyperpara['hidden_layer'] = [16, 8]
+model_hyperpara['batch_size'] = 20
+model_hyperpara['kernel_sizes'] = [5, 5, 5, 5]
+model_hyperpara['stride_sizes'] = [1, 1, 1, 1]
+model_hyperpara['channel_sizes'] = [64, 32]
+model_hyperpara['cnn_KB_sizes'] = [9, 32, 9, 16]
+model_hyperpara['fc_KB_sizes'] = [32, 64, 32, 48, 8, 8]
+model_hyperpara['padding_type'] = 'SAME'
+model_hyperpara['max_pooling'] = True
+model_hyperpara['pooling_size'] = [2, 2, 2, 2]
+model_hyperpara['dropout'] = True
+model_hyperpara['image_dimension'] = [28, 28, 1]
+model_hyperpara['regularization_scale'] = [0.0, 1e-7]
+saved_result = train_run_for_each_model(model_architecture, model_hyperpara, train_hyperpara, [train_data, validation_data, test_data], data_type, data_hyperpara['num_train_group'], mat_file_name, classification_prob, saved_result=saved_result, useGPU=use_gpu, GPU_device=gpu_device_num)
+
+
+
+
+############ change cnn
+
+#### Training one model
+model_architecture = 'ELLA_cnn_linear_relation2'
+model_hyperpara = {}
+model_hyperpara['hidden_layer'] = [32, 16]
+model_hyperpara['batch_size'] = 20
+model_hyperpara['kernel_sizes'] = [5, 5, 5, 5]
+model_hyperpara['stride_sizes'] = [1, 1, 1, 1]
+model_hyperpara['channel_sizes'] = [48, 24]
+model_hyperpara['cnn_KB_sizes'] = [9, 32, 9, 16]
+model_hyperpara['fc_KB_sizes'] = [64, 64, 32, 48, 8, 16]
+model_hyperpara['padding_type'] = 'SAME'
+model_hyperpara['max_pooling'] = True
+model_hyperpara['pooling_size'] = [2, 2, 2, 2]
+model_hyperpara['dropout'] = True
+model_hyperpara['image_dimension'] = [28, 28, 1]
+model_hyperpara['regularization_scale'] = [0.0, 1e-7]
+
+saved_result = train_run_for_each_model(model_architecture, model_hyperpara, train_hyperpara, [train_data, validation_data, test_data], data_type, data_hyperpara['num_train_group'], mat_file_name, classification_prob, saved_result=None, useGPU=use_gpu, GPU_device=gpu_device_num)
+
+
+#### Training one model
+model_architecture = 'ELLA_cnn_linear_relation2'
+model_hyperpara = {}
+model_hyperpara['hidden_layer'] = [64, 32]
+model_hyperpara['batch_size'] = 20
+model_hyperpara['kernel_sizes'] = [5, 5, 5, 5]
+model_hyperpara['stride_sizes'] = [1, 1, 1, 1]
+model_hyperpara['channel_sizes'] = [48, 24]
+model_hyperpara['cnn_KB_sizes'] = [9, 32, 9, 16]
+model_hyperpara['fc_KB_sizes'] = [64, 96, 48, 64, 16, 24]
+model_hyperpara['padding_type'] = 'SAME'
+model_hyperpara['max_pooling'] = True
+model_hyperpara['pooling_size'] = [2, 2, 2, 2]
+model_hyperpara['dropout'] = True
+model_hyperpara['image_dimension'] = [28, 28, 1]
+model_hyperpara['regularization_scale'] = [0.0, 1e-7]
+saved_result = train_run_for_each_model(model_architecture, model_hyperpara, train_hyperpara, [train_data, validation_data, test_data], data_type, data_hyperpara['num_train_group'], mat_file_name, classification_prob, saved_result=saved_result, useGPU=use_gpu, GPU_device=gpu_device_num)
+
+
+#### Training one model
+model_architecture = 'ELLA_cnn_linear_relation2'
+model_hyperpara = {}
+model_hyperpara['hidden_layer'] = [16, 8]
+model_hyperpara['batch_size'] = 20
+model_hyperpara['kernel_sizes'] = [5, 5, 5, 5]
+model_hyperpara['stride_sizes'] = [1, 1, 1, 1]
+model_hyperpara['channel_sizes'] = [48, 24]
+model_hyperpara['cnn_KB_sizes'] = [9, 32, 9, 16]
+model_hyperpara['fc_KB_sizes'] = [32, 64, 32, 48, 8, 8]
+model_hyperpara['padding_type'] = 'SAME'
+model_hyperpara['max_pooling'] = True
+model_hyperpara['pooling_size'] = [2, 2, 2, 2]
+model_hyperpara['dropout'] = True
+model_hyperpara['image_dimension'] = [28, 28, 1]
+model_hyperpara['regularization_scale'] = [0.0, 1e-7]
+saved_result = train_run_for_each_model(model_architecture, model_hyperpara, train_hyperpara, [train_data, validation_data, test_data], data_type, data_hyperpara['num_train_group'], mat_file_name, classification_prob, saved_result=saved_result, useGPU=use_gpu, GPU_device=gpu_device_num)
+
+
+
+
+######################################################################
+################################### Switched to Nonlinear Relation
+######################################################################
+
+#### Training one model
 model_architecture = 'ELLA_cnn_nonlinear_relation2'
 model_hyperpara = {}
 model_hyperpara['hidden_layer'] = [32, 16]
 model_hyperpara['batch_size'] = 20
-model_hyperpara['kernel_sizes'] = [5, 5, 4, 4]
-model_hyperpara['stride_sizes'] = [1, 1, 1, 1]
-model_hyperpara['channel_sizes'] = [32, 64]
-model_hyperpara['cnn_KB_sizes'] = [16, 24, 9, 32]
-model_hyperpara['fc_KB_sizes'] = [128, 64, 64, 128, 8, 8]
-model_hyperpara['padding_type'] = 'SAME'
-model_hyperpara['max_pooling'] = True
-model_hyperpara['pooling_size'] = [2, 2, 2, 2]
-model_hyperpara['dropout'] = True
-model_hyperpara['image_dimension'] = [28, 28, 1]
-model_hyperpara['regularization_scale'] = [0.0001, 0.0001]
-## valid 0.64/test 0.60
-'''
-
-
-'''
-#### Training one model
-model_architecture = 'ELLA_cnn_deconv_relation_relu'
-model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
-model_hyperpara['batch_size'] = 20
 model_hyperpara['kernel_sizes'] = [5, 5, 5, 5]
 model_hyperpara['stride_sizes'] = [1, 1, 1, 1]
 model_hyperpara['channel_sizes'] = [64, 32]
-model_hyperpara['cnn_KB_sizes'] = [3, 32, 3, 16]
-model_hyperpara['cnn_TS_sizes'] = [3, 3]
-model_hyperpara['cnn_deconv_stride_sizes'] = [2, 2, 2, 2]
-model_hyperpara['fc_KB_sizes'] = [64, 64, 32, 64, 8, 16]
+model_hyperpara['cnn_KB_sizes'] = [9, 32, 9, 16]
+model_hyperpara['fc_KB_sizes'] = [64, 64, 32, 48, 8, 16]
 model_hyperpara['padding_type'] = 'SAME'
 model_hyperpara['max_pooling'] = True
 model_hyperpara['pooling_size'] = [2, 2, 2, 2]
 model_hyperpara['dropout'] = True
 model_hyperpara['image_dimension'] = [28, 28, 1]
 model_hyperpara['regularization_scale'] = [0.0, 1e-7]
-## valid 0.795/test 0.784
-'''
 
+saved_result = train_run_for_each_model(model_architecture, model_hyperpara, train_hyperpara, [train_data, validation_data, test_data], data_type, data_hyperpara['num_train_group'], mat_file_name, classification_prob, saved_result=None, useGPU=use_gpu, GPU_device=gpu_device_num)
 
 
 #### Training one model
-model_architecture = 'ELLA_cnn_deconv_relation_tanh'
+model_architecture = 'ELLA_cnn_nonlinear_relation2'
 model_hyperpara = {}
-model_hyperpara['hidden_layer'] = [32, 16]
+model_hyperpara['hidden_layer'] = [64, 32]
 model_hyperpara['batch_size'] = 20
 model_hyperpara['kernel_sizes'] = [5, 5, 5, 5]
 model_hyperpara['stride_sizes'] = [1, 1, 1, 1]
 model_hyperpara['channel_sizes'] = [64, 32]
-model_hyperpara['cnn_KB_sizes'] = [3, 32, 3, 16]
-model_hyperpara['cnn_TS_sizes'] = [3, 3]
-model_hyperpara['cnn_deconv_stride_sizes'] = [2, 2, 2, 2]
-model_hyperpara['fc_KB_sizes'] = [64, 64, 32, 64, 8, 16]
+model_hyperpara['cnn_KB_sizes'] = [9, 32, 9, 16]
+model_hyperpara['fc_KB_sizes'] = [64, 96, 48, 64, 16, 24]
 model_hyperpara['padding_type'] = 'SAME'
 model_hyperpara['max_pooling'] = True
 model_hyperpara['pooling_size'] = [2, 2, 2, 2]
 model_hyperpara['dropout'] = True
 model_hyperpara['image_dimension'] = [28, 28, 1]
 model_hyperpara['regularization_scale'] = [0.0, 1e-7]
-## valid 0.91/test 0.899 (lr 0.01 k KB 3,32,3,16 k TS 3,3 k st 2,2,2,2 fc 32,16 fc KB 64,64,32,64,8,16
-## valid 0.795/test 0.768 (lr 0.05 k KB 3,32,3,16 k TS 3,3 k st 2,2,2,2 fc 32,16 fc KB 64,64,32,64,8,16
+saved_result = train_run_for_each_model(model_architecture, model_hyperpara, train_hyperpara, [train_data, validation_data, test_data], data_type, data_hyperpara['num_train_group'], mat_file_name, classification_prob, saved_result=saved_result, useGPU=use_gpu, GPU_device=gpu_device_num)
+
+
+#### Training one model
+model_architecture = 'ELLA_cnn_nonlinear_relation2'
+model_hyperpara = {}
+model_hyperpara['hidden_layer'] = [16, 8]
+model_hyperpara['batch_size'] = 20
+model_hyperpara['kernel_sizes'] = [5, 5, 5, 5]
+model_hyperpara['stride_sizes'] = [1, 1, 1, 1]
+model_hyperpara['channel_sizes'] = [64, 32]
+model_hyperpara['cnn_KB_sizes'] = [9, 32, 9, 16]
+model_hyperpara['fc_KB_sizes'] = [32, 64, 32, 48, 8, 8]
+model_hyperpara['padding_type'] = 'SAME'
+model_hyperpara['max_pooling'] = True
+model_hyperpara['pooling_size'] = [2, 2, 2, 2]
+model_hyperpara['dropout'] = True
+model_hyperpara['image_dimension'] = [28, 28, 1]
+model_hyperpara['regularization_scale'] = [0.0, 1e-7]
+saved_result = train_run_for_each_model(model_architecture, model_hyperpara, train_hyperpara, [train_data, validation_data, test_data], data_type, data_hyperpara['num_train_group'], mat_file_name, classification_prob, saved_result=saved_result, useGPU=use_gpu, GPU_device=gpu_device_num)
 
 
 
 
+############ change cnn
+
+#### Training one model
+model_architecture = 'ELLA_cnn_nonlinear_relation2'
+model_hyperpara = {}
+model_hyperpara['hidden_layer'] = [32, 16]
+model_hyperpara['batch_size'] = 20
+model_hyperpara['kernel_sizes'] = [5, 5, 5, 5]
+model_hyperpara['stride_sizes'] = [1, 1, 1, 1]
+model_hyperpara['channel_sizes'] = [48, 24]
+model_hyperpara['cnn_KB_sizes'] = [9, 32, 9, 16]
+model_hyperpara['fc_KB_sizes'] = [64, 64, 32, 48, 8, 16]
+model_hyperpara['padding_type'] = 'SAME'
+model_hyperpara['max_pooling'] = True
+model_hyperpara['pooling_size'] = [2, 2, 2, 2]
+model_hyperpara['dropout'] = True
+model_hyperpara['image_dimension'] = [28, 28, 1]
+model_hyperpara['regularization_scale'] = [0.0, 1e-7]
+saved_result = train_run_for_each_model(model_architecture, model_hyperpara, train_hyperpara, [train_data, validation_data, test_data], data_type, data_hyperpara['num_train_group'], mat_file_name, classification_prob, saved_result=None, useGPU=use_gpu, GPU_device=gpu_device_num)
 
 
+#### Training one model
+model_architecture = 'ELLA_cnn_nonlinear_relation2'
+model_hyperpara = {}
+model_hyperpara['hidden_layer'] = [64, 32]
+model_hyperpara['batch_size'] = 20
+model_hyperpara['kernel_sizes'] = [5, 5, 5, 5]
+model_hyperpara['stride_sizes'] = [1, 1, 1, 1]
+model_hyperpara['channel_sizes'] = [48, 24]
+model_hyperpara['cnn_KB_sizes'] = [9, 32, 9, 16]
+model_hyperpara['fc_KB_sizes'] = [64, 96, 48, 64, 16, 24]
+model_hyperpara['padding_type'] = 'SAME'
+model_hyperpara['max_pooling'] = True
+model_hyperpara['pooling_size'] = [2, 2, 2, 2]
+model_hyperpara['dropout'] = True
+model_hyperpara['image_dimension'] = [28, 28, 1]
+model_hyperpara['regularization_scale'] = [0.0, 1e-7]
+saved_result = train_run_for_each_model(model_architecture, model_hyperpara, train_hyperpara, [train_data, validation_data, test_data], data_type, data_hyperpara['num_train_group'], mat_file_name, classification_prob, saved_result=saved_result, useGPU=use_gpu, GPU_device=gpu_device_num)
 
-tmp = train_main(model_architecture, model_hyperpara, train_hyperpara, [train_data[0], validation_data[0], test_data], data_type, True)
 
-#saved_result = train_run_for_each_model(model_architecture, model_hyperpara, train_hyperpara, [train_data, validation_data, test_data], data_type, data_hyperpara['num_train_group'], mat_file_name, classification_prob, saved_result=None, useGPU=use_gpu, GPU_device=gpu_device_num)
-
-
+#### Training one model
+model_architecture = 'ELLA_cnn_nonlinear_relation2'
+model_hyperpara = {}
+model_hyperpara['hidden_layer'] = [16, 8]
+model_hyperpara['batch_size'] = 20
+model_hyperpara['kernel_sizes'] = [5, 5, 5, 5]
+model_hyperpara['stride_sizes'] = [1, 1, 1, 1]
+model_hyperpara['channel_sizes'] = [48, 24]
+model_hyperpara['cnn_KB_sizes'] = [9, 32, 9, 16]
+model_hyperpara['fc_KB_sizes'] = [32, 64, 32, 48, 8, 8]
+model_hyperpara['padding_type'] = 'SAME'
+model_hyperpara['max_pooling'] = True
+model_hyperpara['pooling_size'] = [2, 2, 2, 2]
+model_hyperpara['dropout'] = True
+model_hyperpara['image_dimension'] = [28, 28, 1]
+model_hyperpara['regularization_scale'] = [0.0, 1e-7]
+saved_result = train_run_for_each_model(model_architecture, model_hyperpara, train_hyperpara, [train_data, validation_data, test_data], data_type, data_hyperpara['num_train_group'], mat_file_name, classification_prob, saved_result=saved_result, useGPU=use_gpu, GPU_device=gpu_device_num)

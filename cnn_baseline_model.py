@@ -1,6 +1,8 @@
 import numpy as np
 import tensorflow as tf
-from misc_functions_for_model import *
+
+from utils import *
+from utils_nn import *
 
 #################################################
 #########       Simple CNN batch       ##########
